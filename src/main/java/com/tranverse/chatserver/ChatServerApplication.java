@@ -1,6 +1,6 @@
 package com.tranverse.chatserver;
 
-import com.tranverse.chatserver.security.JwtProperties;
+import com.tranverse.chatserver.security.jwt.JwtProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

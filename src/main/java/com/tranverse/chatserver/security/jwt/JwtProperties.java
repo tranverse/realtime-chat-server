@@ -1,7 +1,6 @@
-package com.tranverse.chatserver.security;
+package com.tranverse.chatserver.security.jwt;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.context.annotation.Configuration;
 import org.springframework.validation.annotation.Validated;
 
 @Validated
