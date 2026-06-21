@@ -1,0 +1,8 @@
+server:
+  port: 8080
+
+jwt:
+  access-key: ${JWT_ACCESS_KEY}
+  refresh-key: ${JWT_REFRESH_KEY}
+  access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES}
+  refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS}
