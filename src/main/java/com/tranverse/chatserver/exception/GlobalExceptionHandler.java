@@ -3,6 +3,7 @@ package com.tranverse.chatserver.exception;
 import com.tranverse.chatserver.enums.ErrorCode;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,6 +37,17 @@ public class GlobalExceptionHandler {
         ErrorResponse response = ErrorResponse.builder()
                 .code(ErrorCode.VALIDATION_ERROR.getCode())
                 .message(message)
+                .status(HttpStatus.BAD_REQUEST.value())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
+
+    @ExceptionHandler(BadCredentialsException.class)
+    public ResponseEntity<ErrorResponse> handleBadCredentialsException(BadCredentialsException e) {
+        ErrorResponse response = ErrorResponse.builder()
+                .code(ErrorCode.INVALID_CREDENTIALS.getCode())
+                .message(ErrorCode.INVALID_CREDENTIALS.getMessage())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .timestamp(LocalDateTime.now())
                 .build();
