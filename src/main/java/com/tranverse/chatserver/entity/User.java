@@ -41,5 +41,17 @@ public class User extends BaseEntity {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<ConversationMember> conversationMembers = new ArrayList<>();
 
-
+    public static User create(String name,
+                              String username,
+                              String email,
+                              String passwordHash,
+                              SystemRole role) {
+        User user = new User();
+        user.name = name;
+        user.username = username;
+        user.email = email;
+        user.passwordHash = passwordHash;
+        user.role = role;
+        return user;
+    }
 }

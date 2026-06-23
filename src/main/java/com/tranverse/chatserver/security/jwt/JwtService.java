@@ -7,6 +7,8 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import com.tranverse.chatserver.enums.ErrorCode;
 import com.tranverse.chatserver.exception.AppException;
+import com.tranverse.chatserver.repository.RefreshTokenRepository;
+import com.tranverse.chatserver.utils.HashTokenUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -84,9 +86,7 @@ public class JwtService {
             SignedJWT signedJWT = SignedJWT.parse(token);
             JWSVerifier verifier = new MACVerifier(props.refreshKey());
 
-            boolean verified = signedJWT.verify(verifier);
-
-            if(!verified){
+            if (!signedJWT.verify(verifier)) {
                 throw new AppException(ErrorCode.INVALID_TOKEN);
             }
 

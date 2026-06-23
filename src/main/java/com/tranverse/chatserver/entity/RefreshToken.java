@@ -2,14 +2,16 @@ package com.tranverse.chatserver.entity;
 
 import com.tranverse.chatserver.entity.User;
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.*;
 
 import java.time.Instant;
 
 @Entity
 @Getter
 @Setter
+@Builder
+@AllArgsConstructor
+@NoArgsConstructor
 public class RefreshToken {
 
     @Id
@@ -38,5 +40,9 @@ public class RefreshToken {
 
     public boolean isRevoked() {
         return revokedAt != null;
+    }
+    @PrePersist
+    public void prePersist() {
+        createdAt = Instant.now();
     }
 }

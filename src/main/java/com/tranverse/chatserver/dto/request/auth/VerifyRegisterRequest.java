@@ -7,11 +7,11 @@ import lombok.Getter;
 
 @Getter
 public class VerifyRegisterRequest {
-    @Email(message = "Email không hợp lệ")
-    @NotBlank(message = "Email không được để trống")
+    @NotBlank(message = "Email is required")
+    @Email(message = "Invalid Email")
     private String email;
 
-    @NotBlank(message = "Code không được để trống")
-    @Pattern(regexp = "\\d{6}", message = "Code phải gồm 6 chữ số")
+    @NotBlank(message = "Code is required")
+    @Pattern(regexp = "\\d{6}", message = "Code must include 6 characters")
     private String code;
 }
