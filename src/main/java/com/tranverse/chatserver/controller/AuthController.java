@@ -1,9 +1,6 @@
 package com.tranverse.chatserver.controller;
 
-import com.tranverse.chatserver.dto.request.auth.LoginRequest;
-import com.tranverse.chatserver.dto.request.auth.RefreshTokenRequest;
-import com.tranverse.chatserver.dto.request.auth.RegisterRequest;
-import com.tranverse.chatserver.dto.request.auth.VerifyRegisterRequest;
+import com.tranverse.chatserver.dto.request.auth.*;
 import com.tranverse.chatserver.dto.response.ApiResponse;
 import com.tranverse.chatserver.dto.response.auth.AuthResponse;
 import com.tranverse.chatserver.dto.response.auth.MessageResponse;
@@ -66,9 +63,72 @@ public class AuthController {
 
         return ResponseEntity.ok(
                 ApiResponse.<AuthResponse>builder()
-                        .code(200)
+                        .code(HttpStatus.OK.value())
                         .message("Refresh token successfully")
                         .data(authService.refreshToken(request))
+                        .build()
+        );
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Logout")
+    public ResponseEntity<ApiResponse<MessageResponse>> logout(@Valid @RequestBody LogoutRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.<MessageResponse>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("Logout successfully")
+                        .data(authService.logout(request))
+                        .build()
+        );
+    }
+
+    @PostMapping("/register/resend")
+    @Operation(summary = "Resend register code", description = "Resend verification code to user's email for completing registration")
+    public ResponseEntity<ApiResponse<MessageResponse>> resendRegisterCode(@RequestBody @Valid ResendRegisterCodeRequest request) {
+
+        return ResponseEntity.ok(
+                ApiResponse.<MessageResponse>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("Resend code successfully")
+                        .data(authService.resendRegisterCode(request))
+                        .build()
+        );
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password", description = "Send OTP code to user's email to reset password")
+    public ResponseEntity<ApiResponse<MessageResponse>> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
+
+        return ResponseEntity.ok(
+                ApiResponse.<MessageResponse>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("OTP sent successfully")
+                        .data(authService.sendForgotPasswordCode(request))
+                        .build()
+        );
+    }
+
+    @PostMapping("/forgot-password/verify")
+    @Operation(summary = "Verify reset code", description = "Verify OTP code sent to email for password reset")
+    public ResponseEntity<ApiResponse<MessageResponse>> verifyResetCode(@RequestBody @Valid VerifyResetCodeRequest request) {
+
+        return ResponseEntity.ok(
+                ApiResponse.<MessageResponse>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("Reset code successfully")
+                        .data(authService.verifyResetCode(request))
+                        .build()
+        );
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password", description = "Reset user's password after OTP verification")
+    public ResponseEntity<ApiResponse<MessageResponse>> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+        return ResponseEntity.ok(
+                ApiResponse.<MessageResponse>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("Reset password successfully")
+                        .data(authService.resetPassword(request))
                         .build()
         );
     }

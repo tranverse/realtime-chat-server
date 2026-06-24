@@ -1,22 +1,22 @@
 package com.tranverse.chatserver.service;
 
-import com.tranverse.chatserver.dto.request.auth.LoginRequest;
-import com.tranverse.chatserver.dto.request.auth.RefreshTokenRequest;
-import com.tranverse.chatserver.dto.request.auth.RegisterRequest;
-import com.tranverse.chatserver.dto.request.auth.VerifyRegisterRequest;
+import com.tranverse.chatserver.dto.request.auth.*;
 import com.tranverse.chatserver.dto.response.auth.AuthResponse;
 import com.tranverse.chatserver.dto.response.auth.MessageResponse;
+import com.tranverse.chatserver.entity.PasswordResetToken;
 import com.tranverse.chatserver.entity.PendingRegistration;
 import com.tranverse.chatserver.entity.RefreshToken;
 import com.tranverse.chatserver.entity.User;
 import com.tranverse.chatserver.enums.ErrorCode;
 import com.tranverse.chatserver.enums.SystemRole;
 import com.tranverse.chatserver.exception.AppException;
+import com.tranverse.chatserver.repository.PasswordResetTokenRepository;
 import com.tranverse.chatserver.repository.PendingRegistrationRepository;
 import com.tranverse.chatserver.repository.RefreshTokenRepository;
 import com.tranverse.chatserver.repository.UserRepository;
 import com.tranverse.chatserver.security.jwt.JwtService;
 import com.tranverse.chatserver.security.user.UserPrincipal;
+import com.tranverse.chatserver.utils.HashTokenUtil;
 import com.tranverse.chatserver.utils.OtpUtils;
 import com.tranverse.chatserver.utils.UsernameUtils;
 import lombok.RequiredArgsConstructor;
@@ -27,6 +27,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -39,11 +40,13 @@ public class AuthService {
     private final PendingRegistrationRepository pendingRegistrationRepository;
     private final PasswordEncoder passwordEncoder;
     private final RefreshTokenService refreshTokenService;
+    private final MailService mailService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final HashTokenUtil hashTokenUtil;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
 
     private static final int CODE_EXPIRED_MINUTES = 5;
     private static final int MAX_ATTEMPTS = 5;
-    private final MailService mailService;
-    private final RefreshTokenRepository refreshTokenRepository;
 
     public AuthResponse login(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -119,7 +122,7 @@ public class AuthService {
 
         return new AuthResponse(accessToken, refreshToken);
     }
-
+    // Rotation Refresh token
     public AuthResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
         RefreshToken refreshToken = refreshTokenService.verify(refreshTokenRequest.getRefreshToken());
 
@@ -130,5 +133,94 @@ public class AuthService {
         String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().toString());
         String newRefreshToken = refreshTokenService.createAndSave(user);
         return new AuthResponse(accessToken, newRefreshToken);
+    }
+
+    public MessageResponse logout(LogoutRequest logoutRequest) {
+        String hash = hashTokenUtil.sha256(logoutRequest.getRefreshToken());
+
+        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash).orElseThrow(
+                () -> new AppException(ErrorCode.INVALID_TOKEN)
+        );
+
+        refreshToken.setRevokedAt(Instant.now());
+        refreshTokenRepository.save(refreshToken);
+
+        return new MessageResponse("Logout successful");
+    }
+
+    public MessageResponse resendRegisterCode(ResendRegisterCodeRequest request) {
+
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
+        }
+
+        String code = OtpUtils.generateCode();
+
+        PendingRegistration pending = pendingRegistrationRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.REGISTER_CODE_NOT_FOUND));
+
+        pending.setCodeHash(passwordEncoder.encode(code));
+        pending.setExpiresAt(LocalDateTime.now().plusMinutes(CODE_EXPIRED_MINUTES));
+        pending.setAttempts(0);
+
+        pendingRegistrationRepository.save(pending);
+
+        mailService.sendRegisterCode(request.getEmail(), code);
+
+        return new MessageResponse("Resend verification code successfully");
+    }
+
+    public MessageResponse sendForgotPasswordCode(ForgotPasswordRequest forgotPasswordRequest) {
+        User user = userRepository.findByEmail(forgotPasswordRequest.getEmail()).orElseThrow(
+                () -> new AppException(ErrorCode.USER_NOT_FOUND)
+        );
+
+        String code = OtpUtils.generateCode();
+
+        PasswordResetToken passwordResetToken = passwordResetTokenRepository.findByEmail(user.getEmail())
+                .orElse(new PasswordResetToken());
+
+        passwordResetToken.setEmail(forgotPasswordRequest.getEmail());
+        passwordResetToken.setAttempts(0);
+        passwordResetToken.setCodeHash(passwordEncoder.encode(code));
+        passwordResetToken.setExpiresAt(LocalDateTime.now().plusMinutes(CODE_EXPIRED_MINUTES));
+        passwordResetTokenRepository.save(passwordResetToken);
+        mailService.sendRegisterCode(forgotPasswordRequest.getEmail(), code);
+        return new MessageResponse("Forgot password code successfully");
+    }
+
+    public MessageResponse verifyResetCode(VerifyResetCodeRequest request) {
+
+        PasswordResetToken token = passwordResetTokenRepository
+                .findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+
+        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            throw new AppException(ErrorCode.TOKEN_EXPIRED);
+        }
+
+        boolean match = passwordEncoder.matches(request.getCode(), token.getCodeHash());
+
+        if (!match) {
+            token.setAttempts(token.getAttempts() + 1);
+            passwordResetTokenRepository.save(token);
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
+
+        return new MessageResponse("Code verified successfully");
+    }
+
+    public MessageResponse resetPassword(ResetPasswordRequest request) {
+
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        passwordResetTokenRepository.deleteByEmail(request.getEmail());
+
+        return new MessageResponse("Password reset successfully");
     }
 }
