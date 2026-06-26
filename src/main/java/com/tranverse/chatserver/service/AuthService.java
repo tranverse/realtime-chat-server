@@ -124,14 +124,12 @@ public class AuthService {
     }
     // Rotation Refresh token
     public AuthResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
-        RefreshToken refreshToken = refreshTokenService.verify(refreshTokenRequest.getRefreshToken());
+        RefreshToken refreshToken = refreshTokenService.consumeForRotation(refreshTokenRequest.getRefreshToken());
 
         User user = refreshToken.getUser();
 
-        refreshTokenService.revoke(refreshTokenRequest.getRefreshToken());
-
         String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().toString());
-        String newRefreshToken = refreshTokenService.createAndSave(user);
+        String newRefreshToken = refreshTokenService.createAndSave(user, refreshToken.getFamilyId());
         return new AuthResponse(accessToken, newRefreshToken);
     }
 
