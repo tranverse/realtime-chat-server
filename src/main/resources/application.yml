@@ -27,13 +27,28 @@ spring:
     redis:
       host: localhost
       port: 6379
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GG_CLIENT_ID}
+            client-secret: ${GG_CLIENT_SECRET}
+            scope:
+              - email
+              - profile
 jwt:
   access-key: ${JWT_ACCESS_KEY}
   refresh-key: ${JWT_REFRESH_KEY}
   access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES}
   refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS}
 
-#logging:
+app:
+  oauth2:
+    redirect-uri: http://localhost:5173/oauth2/redirect
+
+
+
 #  level:
 #    org:
 #      springdoc: DEBUG

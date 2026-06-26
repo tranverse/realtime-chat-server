@@ -8,10 +8,7 @@ import com.tranverse.chatserver.entity.PasswordResetToken;
 import com.tranverse.chatserver.entity.PendingRegistration;
 import com.tranverse.chatserver.entity.RefreshToken;
 import com.tranverse.chatserver.entity.User;
-import com.tranverse.chatserver.enums.ErrorCode;
-import com.tranverse.chatserver.enums.OtpPurpose;
-import com.tranverse.chatserver.enums.RefreshTokenRevokedReason;
-import com.tranverse.chatserver.enums.SystemRole;
+import com.tranverse.chatserver.enums.*;
 import com.tranverse.chatserver.exception.AppException;
 import com.tranverse.chatserver.repository.PasswordResetTokenRepository;
 import com.tranverse.chatserver.repository.PendingRegistrationRepository;
@@ -27,12 +24,14 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Locale;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -304,5 +303,64 @@ public class AuthService {
         refreshTokenService.revokeAllByUserId(user.getId(), RefreshTokenRevokedReason.PASSWORD_RESET);
 
         return new MessageResponse("Password reset successfully");
+    }
+
+   @Transactional
+   public AuthResponse loginWithGoogle(OAuth2User oAuth2User){
+        String providerId = getRequiredAttribute(oAuth2User, "sub");
+        String email = getRequiredAttribute(oAuth2User, "email").toLowerCase(Locale.ROOT);
+
+        Boolean emailVerified = oAuth2User.getAttribute("email_verified");
+
+        if(!Boolean.TRUE.equals(emailVerified)) {
+            throw new AppException(ErrorCode.GOOGLE_EMAIL_NOT_VERIFIED);
+        }
+
+        String name = oAuth2User.getAttribute("name");
+        String picture = oAuth2User.getAttribute("picture");
+
+        User user = userRepository.findByProviderAndProviderId(AuthProvider.GOOGLE, providerId)
+                .or(() -> userRepository.findByEmail(email))
+                .map(existingUser -> {
+                    existingUser.setProviderId(providerId);
+                    existingUser.setProvider(AuthProvider.GOOGLE);
+
+                    if(name != null && !name.isBlank()) {
+                        existingUser.setName(name);
+                    }
+
+                    if(picture != null && !picture.isBlank()) {
+                        existingUser.setAvatar(picture);
+                    }
+                    return userRepository.save(existingUser);
+                })
+                .orElseGet(() -> {
+                    String encodedRandomPassword = passwordEncoder.encode(UUID.randomUUID().toString());
+
+                    User newUser = User.create(
+                            name != null && !name.isBlank() ? name : email,
+                            UsernameUtils.generate(email),
+                            email,
+                            encodedRandomPassword,
+                            SystemRole.USER
+                    );
+                    newUser.setProviderId(providerId);
+                    newUser.setProvider(AuthProvider.GOOGLE);
+                    newUser.setAvatar(picture);
+                    return  userRepository.save(newUser);
+                });
+       String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().toString());
+       String refreshToken = refreshTokenService.createAndSave(user);
+       return new AuthResponse(accessToken, refreshToken);
+   }
+
+    private String getRequiredAttribute(OAuth2User oauth2User, String attributeName) {
+        Object value = oauth2User.getAttribute(attributeName);
+
+        if (value == null || value.toString().isBlank()) {
+            throw new AppException(ErrorCode.INVALID_OAUTH2_USER);
+        }
+
+        return value.toString();
     }
 }

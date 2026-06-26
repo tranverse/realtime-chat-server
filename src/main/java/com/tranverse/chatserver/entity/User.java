@@ -1,5 +1,6 @@
 package com.tranverse.chatserver.entity;
 
+import com.tranverse.chatserver.enums.AuthProvider;
 import com.tranverse.chatserver.enums.SystemRole;
 import jakarta.persistence.*;
 import lombok.*;
@@ -24,7 +25,6 @@ public class User extends BaseEntity {
     @Column(nullable = false, unique = true, length = 180)
     private String email;
 
-    @Column(nullable = false)
     private String passwordHash;
 
     private String avatar;
@@ -37,6 +37,13 @@ public class User extends BaseEntity {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private SystemRole role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AuthProvider provider = AuthProvider.LOCAL;
+
+    @Column(name = "provider_id", unique = true)
+    private String providerId;
 
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<ConversationMember> conversationMembers = new ArrayList<>();
