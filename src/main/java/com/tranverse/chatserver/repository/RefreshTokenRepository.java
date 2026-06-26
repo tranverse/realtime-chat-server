@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.CrudRepository;
 import org.springframework.data.repository.query.Param;
+import org.springframework.security.core.parameters.P;
 
 import java.time.Instant;
 import java.util.Date;
@@ -30,4 +31,9 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
     void revokeActiveByFamilyId(@Param("reason")RefreshTokenRevokedReason reason,
                                 @Param("familyId") UUID familyId,
                                 @Param("now") Instant now);
+
+    @Modifying
+    @Query("UPDATE RefreshToken rt set rt.revokedAt = :now, rt.revokedReason = :reason" +
+            " WHERE rt.user.id = :userId AND rt.revokedAt IS NULL")
+    void revokeAllByUserId(@Param("userId") String userId, @Param("now") Instant now, @Param("reason") RefreshTokenRevokedReason reason);
 }

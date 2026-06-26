@@ -26,7 +26,15 @@ public enum ErrorCode {
 
     // Common
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed"),
-    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error");
+    INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error"),
+
+    // OTP
+    OTP_RESEND_TOO_FAST(HttpStatus.TOO_MANY_REQUESTS, "OTP_RESEND_TOO_FAST", "Please wait before requesting another OTP"),
+    OTP_SEND_TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "OTP_SEND_TOO_MANY_REQUESTS", "Too many OTP requests. Please try again later"),
+    OTP_VERIFY_TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "OTP_VERIFY_TOO_MANY_ATTEMPTS", "Too many incorrect OTP verification attempts. Please try again later."),
+    RESET_CODE_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "RESET_CODE_NOT_VERIFIED", "Reset code has not been verified."),
+    TOKEN_REUSE_DETECTED(HttpStatus.UNAUTHORIZED, "TOKEN_REUSE_DETECTED", "Refresh token reuse detected. Please log in again."),
+            ;
 
     private final HttpStatus status;
     private final String code;

@@ -48,7 +48,7 @@ public class RefreshTokenService {
     }
 
     @Transactional
-    public RefreshToken consumeForRotation(String token) {
+    public RefreshToken verifyForRotation(String token) {
         jwtService.verifyRefreshToken(token);
         String hash = hashTokenUtil.sha256(token);
 
@@ -65,15 +65,22 @@ public class RefreshTokenService {
 
         if(refreshToken.isRevoked()){
             if(RefreshTokenRevokedReason.ROTATED.equals(refreshToken.getRevokedReason())){
-                refreshTokenRepository.revokeActiveByFamilyId(RefreshTokenRevokedReason.REUSE_DETECTED, refreshToken.getFamilyId(), Instant.now());
+                refreshTokenRepository.revokeActiveByFamilyId(
+                        RefreshTokenRevokedReason.REUSE_DETECTED,
+                        refreshToken.getFamilyId(),
+                        Instant.now());
+                throw new AppException(ErrorCode.TOKEN_REUSE_DETECTED);
             }
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
+        return refreshToken;
+    }
 
+    @Transactional
+    public void revokeAsRotated(RefreshToken refreshToken) {
         refreshToken.setRevokedAt(Instant.now());
         refreshToken.setRevokedReason(RefreshTokenRevokedReason.ROTATED);
         refreshTokenRepository.save(refreshToken);
-        return refreshToken;
     }
 
     public RefreshToken verify(String token) {
@@ -101,10 +108,16 @@ public class RefreshTokenService {
 
         RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash)
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
+
         if(!refreshToken.isRevoked()) {
             refreshToken.setRevokedAt(Instant.now());
             refreshToken.setRevokedReason(revokedReason);
             refreshTokenRepository.save(refreshToken);
         }
+    }
+
+    @Transactional
+    public void revokeAllByUserId(String userId, RefreshTokenRevokedReason revokedReason) {
+        refreshTokenRepository.revokeAllByUserId(userId, Instant.now(), revokedReason);
     }
 }

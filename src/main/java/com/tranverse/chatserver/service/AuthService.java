@@ -25,6 +25,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -47,6 +48,7 @@ public class AuthService {
 
     private static final int CODE_EXPIRED_MINUTES = 5;
     private static final int MAX_ATTEMPTS = 5;
+
 
     public AuthResponse login(LoginRequest loginRequest) {
         Authentication authentication = authenticationManager.authenticate(
@@ -123,13 +125,17 @@ public class AuthService {
         return new AuthResponse(accessToken, refreshToken);
     }
     // Rotation Refresh token
+    @Transactional
     public AuthResponse refreshToken(RefreshTokenRequest refreshTokenRequest) {
-        RefreshToken refreshToken = refreshTokenService.consumeForRotation(refreshTokenRequest.getRefreshToken());
+        RefreshToken oldRefreshToken  = refreshTokenService.verifyForRotation(refreshTokenRequest.getRefreshToken());
 
-        User user = refreshToken.getUser();
+        User user = oldRefreshToken .getUser();
+
+        refreshTokenService.revokeAsRotated(oldRefreshToken);
 
         String accessToken = jwtService.generateAccessToken(user.getId().toString(), user.getRole().toString());
-        String newRefreshToken = refreshTokenService.createAndSave(user, refreshToken.getFamilyId());
+        String newRefreshToken = refreshTokenService.createAndSave(user, oldRefreshToken.getFamilyId());
+
         return new AuthResponse(accessToken, newRefreshToken);
     }
 

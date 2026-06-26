@@ -7,5 +7,6 @@ public enum RefreshTokenRevokedReason {
     REUSE_DETECTED,
     RESET_PASSWORD,
     EXPIRED,
-    ROTATED
+    ROTATED,
+    PASSWORD_RESET
 }
