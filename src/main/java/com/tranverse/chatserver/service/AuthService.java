@@ -3,11 +3,14 @@ package com.tranverse.chatserver.service;
 import com.tranverse.chatserver.dto.request.auth.*;
 import com.tranverse.chatserver.dto.response.auth.AuthResponse;
 import com.tranverse.chatserver.dto.response.auth.MessageResponse;
+import com.tranverse.chatserver.dto.response.auth.VerifyResetCodeResponse;
 import com.tranverse.chatserver.entity.PasswordResetToken;
 import com.tranverse.chatserver.entity.PendingRegistration;
 import com.tranverse.chatserver.entity.RefreshToken;
 import com.tranverse.chatserver.entity.User;
 import com.tranverse.chatserver.enums.ErrorCode;
+import com.tranverse.chatserver.enums.OtpPurpose;
+import com.tranverse.chatserver.enums.RefreshTokenRevokedReason;
 import com.tranverse.chatserver.enums.SystemRole;
 import com.tranverse.chatserver.exception.AppException;
 import com.tranverse.chatserver.repository.PasswordResetTokenRepository;
@@ -45,8 +48,9 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final HashTokenUtil hashTokenUtil;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final OtpRateLimiterService otpRateLimiterService;
 
-    private static final int CODE_EXPIRED_MINUTES = 5;
+    private static final int CODE_EXPIRED_MINUTES = 2;
     private static final int MAX_ATTEMPTS = 5;
 
 
@@ -65,15 +69,17 @@ public class AuthService {
         return new AuthResponse(accessToken, refreshToken);
     }
 
-    public MessageResponse sendRegisterCode(RegisterRequest registerRequest) {
+    public MessageResponse sendRegisterCode(RegisterRequest registerRequest, String ip) {
+        otpRateLimiterService.checkSendLimit(OtpPurpose.REGISTER, registerRequest.getEmail(), ip);
+
         if(userRepository.existsByEmail(registerRequest.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
+
         String code = OtpUtils.generateCode();
 
         PendingRegistration pendingRegistration = pendingRegistrationRepository.findByEmail(registerRequest.getEmail())
                 .orElseGet(PendingRegistration::new);
-
 
         pendingRegistration.setEmail(registerRequest.getEmail());
         pendingRegistration.setName(registerRequest.getName());
@@ -87,7 +93,13 @@ public class AuthService {
         return new MessageResponse("Verification code sent to email");
     }
 
-    public AuthResponse verifyRegisterCode(VerifyRegisterRequest verifyRegisterRequest) {
+    public AuthResponse verifyRegisterCode(VerifyRegisterRequest verifyRegisterRequest, String ip) {
+        otpRateLimiterService.checkVerifyLimit(
+                OtpPurpose.REGISTER,
+                verifyRegisterRequest.getEmail(),
+                ip
+        );
+
         if(userRepository.existsByEmail(verifyRegisterRequest.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
@@ -110,6 +122,12 @@ public class AuthService {
             pendingRegistrationRepository.save(pendingRegistration);
             throw new AppException(ErrorCode.INVALID_REGISTER_CODE);
         }
+
+        otpRateLimiterService.clearVerifyLimit(
+                OtpPurpose.REGISTER,
+                verifyRegisterRequest.getEmail(),
+                ip
+        );
 
         User user = User.create(pendingRegistration.getName(),
                 UsernameUtils.generate(pendingRegistration.getEmail()),
@@ -139,21 +157,24 @@ public class AuthService {
         return new AuthResponse(accessToken, newRefreshToken);
     }
 
+    @Transactional
     public MessageResponse logout(LogoutRequest logoutRequest) {
-        String hash = hashTokenUtil.sha256(logoutRequest.getRefreshToken());
-
-        RefreshToken refreshToken = refreshTokenRepository.findByTokenHash(hash).orElseThrow(
-                () -> new AppException(ErrorCode.INVALID_TOKEN)
+        refreshTokenService.revoke(
+                logoutRequest.getRefreshToken(),
+                RefreshTokenRevokedReason.LOGOUT
         );
-
-        refreshToken.setRevokedAt(Instant.now());
-        refreshTokenRepository.save(refreshToken);
 
         return new MessageResponse("Logout successful");
     }
 
-    public MessageResponse resendRegisterCode(ResendRegisterCodeRequest request) {
+    @Transactional
+    public MessageResponse logoutAllDevices(UserPrincipal userPrincipal) {
+        refreshTokenService.revokeAllByUserId(userPrincipal.id(), RefreshTokenRevokedReason.LOGOUT_ALL);
+        return new MessageResponse("Logged out from all devices successfully");
+    }
 
+    public MessageResponse resendRegisterCode(ResendRegisterCodeRequest request, String ip) {
+        otpRateLimiterService.checkSendLimit(OtpPurpose.REGISTER, request.getEmail(), ip);
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new AppException(ErrorCode.EMAIL_ALREADY_EXISTS);
         }
@@ -175,7 +196,13 @@ public class AuthService {
         return new MessageResponse("Resend verification code successfully");
     }
 
-    public MessageResponse sendForgotPasswordCode(ForgotPasswordRequest forgotPasswordRequest) {
+    public MessageResponse sendForgotPasswordCode(ForgotPasswordRequest forgotPasswordRequest, String ip) {
+        otpRateLimiterService.checkSendLimit(
+                OtpPurpose.RESET_PASSWORD,
+                forgotPasswordRequest.getEmail(),
+                ip
+        );
+
         User user = userRepository.findByEmail(forgotPasswordRequest.getEmail()).orElseThrow(
                 () -> new AppException(ErrorCode.USER_NOT_FOUND)
         );
@@ -189,20 +216,37 @@ public class AuthService {
         passwordResetToken.setAttempts(0);
         passwordResetToken.setCodeHash(passwordEncoder.encode(code));
         passwordResetToken.setExpiresAt(LocalDateTime.now().plusMinutes(CODE_EXPIRED_MINUTES));
+
+        passwordResetToken.setVerifiedAt(null);
+        passwordResetToken.setResetTokenHash(null);
+        passwordResetToken.setResetTokenExpiresAt(null);
+
         passwordResetTokenRepository.save(passwordResetToken);
         mailService.sendRegisterCode(forgotPasswordRequest.getEmail(), code);
         return new MessageResponse("Forgot password code successfully");
     }
 
-    public MessageResponse verifyResetCode(VerifyResetCodeRequest request) {
-
+    @Transactional
+    public VerifyResetCodeResponse verifyResetCode(VerifyResetCodeRequest request, String ip) {
+        otpRateLimiterService.checkVerifyLimit(
+                OtpPurpose.RESET_PASSWORD,
+                request.getEmail(),
+                ip
+        );
         PasswordResetToken token = passwordResetTokenRepository
                 .findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.INVALID_TOKEN));
 
         if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            passwordResetTokenRepository.delete(token);
             throw new AppException(ErrorCode.TOKEN_EXPIRED);
         }
+
+        if (token.getAttempts() >= MAX_ATTEMPTS) {
+            passwordResetTokenRepository.delete(token);
+            throw new AppException(ErrorCode.OTP_VERIFY_TOO_MANY_ATTEMPTS);
+        }
+
 
         boolean match = passwordEncoder.matches(request.getCode(), token.getCodeHash());
 
@@ -212,10 +256,42 @@ public class AuthService {
             throw new AppException(ErrorCode.INVALID_TOKEN);
         }
 
-        return new MessageResponse("Code verified successfully");
+        String resetToken = UUID.randomUUID().toString();
+
+        token.setVerifiedAt(LocalDateTime.now());
+        token.setResetTokenHash(hashTokenUtil.sha256(resetToken));
+        token.setResetTokenExpiresAt(LocalDateTime.now().plusMinutes(10));
+        passwordResetTokenRepository.save(token);
+
+        otpRateLimiterService.clearVerifyLimit(
+                OtpPurpose.RESET_PASSWORD,
+                request.getEmail(),
+                ip
+        );
+
+
+        return new VerifyResetCodeResponse(resetToken, "Code verified successfully");
     }
 
+    @Transactional
     public MessageResponse resetPassword(ResetPasswordRequest request) {
+        PasswordResetToken token = passwordResetTokenRepository.findByEmail(request.getEmail()).orElseThrow(
+                () -> new AppException(ErrorCode.INVALID_TOKEN)
+        );
+        if(token.getVerifiedAt() == null) {
+            throw new AppException(ErrorCode.RESET_CODE_NOT_VERIFIED);
+        }
+
+        if (token.getResetTokenExpiresAt() == null || token.getResetTokenExpiresAt().isBefore(LocalDateTime.now())) {
+            passwordResetTokenRepository.delete(token);
+            throw new AppException(ErrorCode.TOKEN_EXPIRED);
+        }
+
+        String requestResetToken = hashTokenUtil.sha256(request.getResetToken());
+
+        if(!requestResetToken.equals(token.getResetTokenHash())) {
+            throw new AppException(ErrorCode.INVALID_TOKEN);
+        }
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new AppException(ErrorCode.USER_NOT_FOUND));
@@ -224,6 +300,8 @@ public class AuthService {
         userRepository.save(user);
 
         passwordResetTokenRepository.deleteByEmail(request.getEmail());
+
+        refreshTokenService.revokeAllByUserId(user.getId(), RefreshTokenRevokedReason.PASSWORD_RESET);
 
         return new MessageResponse("Password reset successfully");
     }

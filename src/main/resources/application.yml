@@ -17,10 +17,27 @@ spring:
     port: 587
     username: ${MAIL_USERNAME}
     password: ${MAIL_PASSWORD}
-
-
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  data:
+    redis:
+      host: localhost
+      port: 6379
 jwt:
   access-key: ${JWT_ACCESS_KEY}
   refresh-key: ${JWT_REFRESH_KEY}
   access-expiration-minutes: ${JWT_ACCESS_EXPIRATION_MINUTES}
   refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS}
+
+#logging:
+#  level:
+#    org:
+#      springdoc: DEBUG
+#      springframework:
+#        web: DEBUG
+#        boot:
+#          autoconfigure: DEBUG

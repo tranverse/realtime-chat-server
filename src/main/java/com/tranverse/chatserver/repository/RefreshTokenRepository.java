@@ -35,5 +35,5 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, Stri
     @Modifying
     @Query("UPDATE RefreshToken rt set rt.revokedAt = :now, rt.revokedReason = :reason" +
             " WHERE rt.user.id = :userId AND rt.revokedAt IS NULL")
-    void revokeAllByUserId(@Param("userId") String userId, @Param("now") Instant now, @Param("reason") RefreshTokenRevokedReason reason);
+    void revokeAllByUserId(@Param("userId") UUID userId, @Param("now") Instant now, @Param("reason") RefreshTokenRevokedReason reason);
 }

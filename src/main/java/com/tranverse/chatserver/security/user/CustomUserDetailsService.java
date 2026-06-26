@@ -18,15 +18,16 @@ import java.util.List;
 public class CustomUserDetailsService implements UserDetailsService {
     private final UserRepository userRepository;
     @Override
-    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByUsernameAndDeletedAtIsNull(username)
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmailAndDeletedAtIsNull(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentails"));
 
         return new UserPrincipal(
-                user.getId().toString(),
+                user.getId(),
                 user.getUsername(),
                 user.getPasswordHash(),
                 user.getRole().toString(),
+                user.getEmail(),
                 List.of(new SimpleGrantedAuthority("ROLE" + user.getRole()))
         );
 

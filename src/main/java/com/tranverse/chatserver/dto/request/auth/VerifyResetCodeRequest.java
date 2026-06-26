@@ -11,6 +11,10 @@ import lombok.Setter;
 public class VerifyResetCodeRequest {
     @NotBlank(message = "Email is required")
     @Email(message = "Invalid Email")
+    @Pattern(
+            regexp = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+            message = "Invalid email format"
+    )
     private String email;
 
     @NotBlank(message = "Code is required")

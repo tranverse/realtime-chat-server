@@ -117,7 +117,7 @@ public class RefreshTokenService {
     }
 
     @Transactional
-    public void revokeAllByUserId(String userId, RefreshTokenRevokedReason revokedReason) {
+    public void revokeAllByUserId(UUID userId, RefreshTokenRevokedReason revokedReason) {
         refreshTokenRepository.revokeAllByUserId(userId, Instant.now(), revokedReason);
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 
@@ -54,14 +55,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
 
-    @ExceptionHandler(Exception.class)
-    public ResponseEntity<ErrorResponse> handleException(Exception e) {
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponse> handleNoResourceFoundException(NoResourceFoundException e) {
         ErrorResponse response = ErrorResponse.builder()
-                .code(ErrorCode.INTERNAL_ERROR.getCode())
-                .message(ErrorCode.INTERNAL_ERROR.getMessage())
-                .status(ErrorCode.INTERNAL_ERROR.getStatus().value())
+                .code("404")
+                .message("Resource not found")
+                .status(HttpStatus.NOT_FOUND.value())
                 .timestamp(LocalDateTime.now())
                 .build();
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
+
+
+//    @ExceptionHandler(Exception.class)
+//    public ResponseEntity<ErrorResponse> handleException(Exception e) {
+//        ErrorResponse response = ErrorResponse.builder()
+//                .code(ErrorCode.INTERNAL_ERROR.getCode())
+//                .message(ErrorCode.INTERNAL_ERROR.getMessage())
+//                .status(ErrorCode.INTERNAL_ERROR.getStatus().value())
+//                .timestamp(LocalDateTime.now())
+//                .build();
+//        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+//    }
 }

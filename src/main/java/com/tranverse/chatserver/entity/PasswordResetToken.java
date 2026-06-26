@@ -1,9 +1,6 @@
 package com.tranverse.chatserver.entity;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -17,11 +14,21 @@ public class PasswordResetToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @Column(nullable = false, unique = true)
     private String email;
 
+    @Column(nullable = false)
     private String codeHash;
 
+    @Column(nullable = false)
     private LocalDateTime expiresAt;
 
-    private int attempts = 0;
+    @Column(nullable = false)
+    private Integer attempts;
+
+    private LocalDateTime verifiedAt;
+
+    private String resetTokenHash;
+
+    private LocalDateTime resetTokenExpiresAt;
 }
