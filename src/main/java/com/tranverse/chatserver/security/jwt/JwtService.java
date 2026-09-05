@@ -10,7 +10,6 @@ import com.tranverse.chatserver.exception.AppException;
 import com.tranverse.chatserver.repository.RefreshTokenRepository;
 import com.tranverse.chatserver.utils.HashTokenUtil;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.text.ParseException;
@@ -22,7 +21,6 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class JwtService {
     private final JwtProperties props;
     private static final String CLAIM_AUTHORITY = "authorities";
@@ -44,8 +42,6 @@ public class JwtService {
                 .expirationTime(Date.from(expireAt))
                 .claim(CLAIM_TOKEN_TYPE, TOKEN_TYPE_ACCESS)
                 .claim(CLAIM_AUTHORITY, List.of(role)).build();
-        log.info("JWT KEY = {}", props.accessKey());
-        log.info("LENGTH = {}", props.accessKey().length());
         return sign(claims, props.accessKey());
     }
 
@@ -96,6 +92,10 @@ public class JwtService {
 
             JWTClaimsSet claims = signedJWT.getJWTClaimsSet();
             Date expiration = claims.getExpirationTime();
+
+            if (!ISSUER.equals(claims.getIssuer()) || expiration == null) {
+                throw new AppException(ErrorCode.INVALID_TOKEN);
+            }
 
             if(expiration.before(new Date())){
                 throw new AppException(ErrorCode.TOKEN_EXPIRED);

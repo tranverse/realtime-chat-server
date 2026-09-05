@@ -168,7 +168,12 @@ public class AuthService {
 
     @Transactional
     public MessageResponse logoutAllDevices(UserPrincipal userPrincipal) {
-        refreshTokenService.revokeAllByUserId(userPrincipal.id(), RefreshTokenRevokedReason.LOGOUT_ALL);
+        return logoutAllDevices(userPrincipal.id());
+    }
+
+    @Transactional
+    public MessageResponse logoutAllDevices(UUID userId) {
+        refreshTokenService.revokeAllByUserId(userId, RefreshTokenRevokedReason.LOGOUT_ALL);
         return new MessageResponse("Logged out from all devices successfully");
     }
 

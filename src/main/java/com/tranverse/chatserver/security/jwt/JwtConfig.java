@@ -4,7 +4,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
+import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.stereotype.Component;
@@ -14,11 +20,25 @@ import javax.crypto.spec.SecretKeySpec;
 @Configuration
 @RequiredArgsConstructor
 public class JwtConfig {
+    private static final String ISSUER = "tranverse";
+    private static final String ACCESS_TOKEN_TYPE = "access";
+
     private final JwtProperties props;
     @Bean
     public JwtDecoder jwtDecoder() {
         SecretKeySpec secretKeySpec = new SecretKeySpec(props.accessKey().getBytes(), "HmacSHA256");
-        return NimbusJwtDecoder.withSecretKey(secretKeySpec).build();
+        NimbusJwtDecoder decoder = NimbusJwtDecoder.withSecretKey(secretKeySpec).build();
+        OAuth2TokenValidator<Jwt> issuerValidator = JwtValidators.createDefaultWithIssuer(ISSUER);
+        OAuth2TokenValidator<Jwt> accessTokenValidator = jwt -> {
+            if (ACCESS_TOKEN_TYPE.equals(jwt.getClaimAsString("token_type"))) {
+                return OAuth2TokenValidatorResult.success();
+            }
+            return OAuth2TokenValidatorResult.failure(
+                    new OAuth2Error("invalid_token", "Expected an access token", null));
+        };
+        decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
+                issuerValidator, accessTokenValidator));
+        return decoder;
     }
 
     @Bean

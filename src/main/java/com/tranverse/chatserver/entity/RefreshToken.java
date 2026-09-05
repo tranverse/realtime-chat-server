@@ -1,6 +1,5 @@
 package com.tranverse.chatserver.entity;
 
-import com.tranverse.chatserver.entity.User;
 import com.tranverse.chatserver.enums.RefreshTokenRevokedReason;
 import jakarta.persistence.*;
 import lombok.*;
@@ -14,7 +13,7 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class    RefreshToken {
+public class RefreshToken {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -36,6 +35,7 @@ public class    RefreshToken {
     private Instant revokedAt;
 
     @Column(name = "created_at", nullable = false)
+    @Builder.Default
     private Instant createdAt = Instant.now();
 
     @Enumerated(EnumType.STRING)

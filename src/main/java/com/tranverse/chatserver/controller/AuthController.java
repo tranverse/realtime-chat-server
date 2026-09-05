@@ -7,6 +7,7 @@ import com.tranverse.chatserver.dto.response.auth.MessageResponse;
 import com.tranverse.chatserver.dto.response.auth.VerifyResetCodeResponse;
 import com.tranverse.chatserver.service.AuthService;
 import com.tranverse.chatserver.utils.ClientIpUtils;
+import com.tranverse.chatserver.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
@@ -14,6 +15,8 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -84,6 +87,19 @@ public class AuthController {
                         .code(HttpStatus.OK.value())
                         .message("Logout successfully")
                         .data(authService.logout(request))
+                        .build()
+        );
+    }
+
+    @PostMapping("/logout-all")
+    @Operation(summary = "Logout all devices", description = "Revoke all refresh tokens of the current user")
+    public ResponseEntity<ApiResponse<MessageResponse>> logoutAllDevices(
+            @AuthenticationPrincipal Jwt jwt) {
+        return ResponseEntity.ok(
+                ApiResponse.<MessageResponse>builder()
+                        .code(HttpStatus.OK.value())
+                        .message("Logged out from all devices successfully")
+                        .data(authService.logoutAllDevices(SecurityUtils.userId(jwt)))
                         .build()
         );
     }
