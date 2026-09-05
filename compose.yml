@@ -1,0 +1,60 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: chat_application
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-8080}:8080"
+    environment:
+      DB_URL: jdbc:mysql://mysql:3306/chat_application?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in .env}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      MAIL_USERNAME: ${MAIL_USERNAME:?Set MAIL_USERNAME in .env}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:?Set MAIL_PASSWORD in .env}
+      GG_CLIENT_ID: ${GG_CLIENT_ID:?Set GG_CLIENT_ID in .env}
+      GG_CLIENT_SECRET: ${GG_CLIENT_SECRET:?Set GG_CLIENT_SECRET in .env}
+      JWT_ACCESS_KEY: ${JWT_ACCESS_KEY:?Set JWT_ACCESS_KEY in .env}
+      JWT_REFRESH_KEY: ${JWT_REFRESH_KEY:?Set JWT_REFRESH_KEY in .env}
+      JWT_ACCESS_EXPIRATION_MINUTES: ${JWT_ACCESS_EXPIRATION_MINUTES:-15}
+      JWT_REFRESH_EXPIRATION_DAYS: ${JWT_REFRESH_EXPIRATION_DAYS:-30}
+      OAUTH2_REDIRECT_URI: ${OAUTH2_REDIRECT_URI:-http://localhost:5173/oauth2/redirect}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173}
+      JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
+      JPA_SHOW_SQL: "false"
+
+volumes:
+  mysql-data:
+  redis-data:
