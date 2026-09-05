@@ -3,6 +3,8 @@ package com.tranverse.chatserver.entity;
 import com.tranverse.chatserver.enums.JoinRequestStatus;
 import jakarta.persistence.*;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.AccessLevel;
 import lombok.Setter;
 
 import java.time.Instant;
@@ -10,6 +12,7 @@ import java.time.Instant;
 @Entity
 @Getter
 @Setter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class ConversationJoinRequest extends BaseEntity {
 
     private String message;
@@ -36,5 +39,29 @@ public class ConversationJoinRequest extends BaseEntity {
     @JoinColumn(name = "invite_link_id")
     private ConversationInviteLink inviteLink;
 
+    public static ConversationJoinRequest create(String message,
+                                                 User requestedByUser,
+                                                 Conversation conversation,
+                                                 ConversationInviteLink inviteLink) {
+        ConversationJoinRequest request = new ConversationJoinRequest();
+        request.message = message;
+        request.requestedByUser = requestedByUser;
+        request.conversation = conversation;
+        request.inviteLink = inviteLink;
+        request.status = JoinRequestStatus.PENDING;
+        return request;
+    }
+
+    public void approve(ConversationMember reviewer) {
+        status = JoinRequestStatus.APPROVED;
+        reviewedByMember = reviewer;
+        reviewedAt = Instant.now();
+    }
+
+    public void reject(ConversationMember reviewer) {
+        status = JoinRequestStatus.REJECTED;
+        reviewedByMember = reviewer;
+        reviewedAt = Instant.now();
+    }
 
 }

@@ -2,16 +2,22 @@ package com.tranverse.chatserver.entity;
 
 import com.tranverse.chatserver.enums.ConversationMemberRole;
 import com.tranverse.chatserver.enums.ConversationMemberStatus;
-import com.tranverse.chatserver.enums.ConversationType;
 import com.tranverse.chatserver.enums.JoinMethod;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.List;
 
 @Entity
+@Table(name = "conversation_members",
+        uniqueConstraints = @UniqueConstraint(
+                name = "uk_conversation_member_user",
+                columnNames = {"conversation_id", "user_id"}
+        ),
+        indexes = {
+                @Index(name = "idx_member_user_status", columnList = "user_id,status"),
+                @Index(name = "idx_member_conversation_status", columnList = "conversation_id,status")
+        })
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -60,7 +66,37 @@ public class ConversationMember extends BaseEntity {
 
     @PrePersist
     protected void onCreate() {
+        if (this.joinedAt == null) {
+            this.joinedAt = Instant.now();
+        }
+    }
+
+    public static ConversationMember create(Conversation conversation,
+                                            User user,
+                                            ConversationMemberRole role,
+                                            JoinMethod joinMethod,
+                                            ConversationMember invitedByMember) {
+        ConversationMember member = new ConversationMember();
+        member.conversation = conversation;
+        member.user = user;
+        member.role = role;
+        member.joinMethod = joinMethod;
+        member.invitedByMember = invitedByMember;
+        member.status = ConversationMemberStatus.ACTIVE;
+        member.joinedAt = Instant.now();
+        return member;
+    }
+
+    public void reactivate(ConversationMemberRole role,
+                           JoinMethod joinMethod,
+                           ConversationMember invitedByMember) {
+        this.role = role;
+        this.joinMethod = joinMethod;
+        this.invitedByMember = invitedByMember;
+        this.status = ConversationMemberStatus.ACTIVE;
         this.joinedAt = Instant.now();
+        this.leftAt = null;
+        this.removedAt = null;
     }
 
     public void leave(){
@@ -80,6 +116,10 @@ public class ConversationMember extends BaseEntity {
 
     public void promoteToAdmin(){
         this.role = ConversationMemberRole.ADMIN;
+    }
+
+    public void demoteToMember() {
+        this.role = ConversationMemberRole.MEMBER;
     }
 
 }

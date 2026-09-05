@@ -39,4 +39,23 @@ public class ConversationInviteLink extends BaseEntity {
         this.status = InviteLinkStatus.REVOKED;
         this.revokedAt = Instant.now();
     }
+
+    public boolean isUsable() {
+        return status == InviteLinkStatus.ACTIVE && expiredAt.isAfter(Instant.now());
+    }
+
+    public static ConversationInviteLink create(String code,
+                                                boolean requireApproval,
+                                                Instant expiredAt,
+                                                Conversation conversation,
+                                                ConversationMember createdByMember) {
+        ConversationInviteLink link = new ConversationInviteLink();
+        link.code = code;
+        link.requireApproval = requireApproval;
+        link.expiredAt = expiredAt;
+        link.conversation = conversation;
+        link.createdByMember = createdByMember;
+        link.status = InviteLinkStatus.ACTIVE;
+        return link;
+    }
 }

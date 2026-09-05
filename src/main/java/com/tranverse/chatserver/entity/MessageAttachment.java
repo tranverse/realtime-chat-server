@@ -22,4 +22,12 @@ public class MessageAttachment extends BaseEntity {
     @JoinColumn(name = "message_id", nullable = false)
     private Message message;
 
+    public static MessageAttachment create(String fileUrl, String fileType, Long fileSize, Message message) {
+        MessageAttachment attachment = new MessageAttachment();
+        attachment.fileUrl = fileUrl;
+        attachment.fileType = fileType;
+        attachment.fileSize = fileSize;
+        attachment.message = message;
+        return attachment;
+    }
 }

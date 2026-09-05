@@ -20,10 +20,24 @@ public enum ErrorCode {
     INVALID_OAUTH2_USER(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_OAUTH2_USER", "Invalid oauth2 user"),
     GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "GOOGLE_EMAIL_NOT_VERIFIED", "Google account email is not verified"),    // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"),
+    USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "Username already exists"),
 
     // Conversation
     CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND", "Conversation not found"),
     FORBIDDEN_CONVERSATION(HttpStatus.FORBIDDEN, "CONVERSATION_FORBIDDEN", "You do not have permission in this conversation"),
+    INVALID_CONVERSATION(HttpStatus.BAD_REQUEST, "INVALID_CONVERSATION", "Invalid conversation data"),
+    MEMBER_NOT_FOUND(HttpStatus.NOT_FOUND, "MEMBER_NOT_FOUND", "Conversation member not found"),
+    MEMBER_ALREADY_EXISTS(HttpStatus.CONFLICT, "MEMBER_ALREADY_EXISTS", "User is already a conversation member"),
+    OWNER_CANNOT_LEAVE(HttpStatus.BAD_REQUEST, "OWNER_CANNOT_LEAVE", "Owner must transfer ownership before leaving"),
+    MEMBER_LIMIT_REACHED(HttpStatus.CONFLICT, "MEMBER_LIMIT_REACHED", "Conversation member limit reached"),
+    INVITE_LINK_NOT_FOUND(HttpStatus.NOT_FOUND, "INVITE_LINK_NOT_FOUND", "Invite link not found"),
+    INVITE_LINK_UNAVAILABLE(HttpStatus.GONE, "INVITE_LINK_UNAVAILABLE", "Invite link is expired or revoked"),
+    JOIN_REQUEST_NOT_FOUND(HttpStatus.NOT_FOUND, "JOIN_REQUEST_NOT_FOUND", "Join request not found"),
+    JOIN_REQUEST_ALREADY_EXISTS(HttpStatus.CONFLICT, "JOIN_REQUEST_ALREADY_EXISTS", "A pending join request already exists"),
+
+    // Message
+    MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MESSAGE_NOT_FOUND", "Message not found"),
+    INVALID_MESSAGE(HttpStatus.BAD_REQUEST, "INVALID_MESSAGE", "Message content is required"),
 
     // Common
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed"),
