@@ -5,6 +5,7 @@ import com.tranverse.chatserver.security.oauth.OAuth2LoginSuccessHandler;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -34,13 +35,25 @@ import java.util.Arrays;
 @EnableMethodSecurity
 public class SecurityConfig {
     private static final String[] PUBLIC_ENDPOINTS = {
-            "/api/v1/auth/**",
+            "/api/v1/auth/login",
+            "/api/v1/auth/register",
+            "/api/v1/auth/register/verify",
+            "/api/v1/auth/register/resend",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/forgot-password/verify",
+            "/api/v1/auth/reset-password",
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/v3/api-docs/**",
             "/v3/api-docs.yaml",
             "/oauth2/**",
             "/login/oauth2/**",
+            "/ws",
+            "/ws/**",
+            "/actuator/health",
+            "/actuator/info",
     };
 
     private final JwtDecoder jwtDecoder;
@@ -48,6 +61,9 @@ public class SecurityConfig {
     private final JwtAuthenticationConverter jwtAuthenticationConverter;
     private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
     private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
+
+    @Value("${app.cors.allowed-origins:http://localhost:5173}")
+    private String allowedOrigins;
 
 //    @Bean
 //    PasswordEncoder passwordEncoder() {
@@ -86,8 +102,11 @@ public class SecurityConfig {
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("*"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedOrigins(Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toList());
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
         configuration.setAllowCredentials(false);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();

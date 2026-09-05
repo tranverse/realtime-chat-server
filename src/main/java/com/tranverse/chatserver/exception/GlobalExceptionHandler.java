@@ -1,17 +1,24 @@
 package com.tranverse.chatserver.exception;
 
 import com.tranverse.chatserver.enums.ErrorCode;
+import jakarta.validation.ConstraintViolationException;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.time.LocalDateTime;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleAppException(AppException e) {
@@ -49,10 +56,31 @@ public class GlobalExceptionHandler {
         ErrorResponse response = ErrorResponse.builder()
                 .code(ErrorCode.INVALID_CREDENTIALS.getCode())
                 .message(ErrorCode.INVALID_CREDENTIALS.getMessage())
-                .status(HttpStatus.BAD_REQUEST.value())
+                .status(HttpStatus.UNAUTHORIZED.value())
                 .timestamp(LocalDateTime.now())
                 .build();
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+    }
+
+    @ExceptionHandler({ConstraintViolationException.class, MethodArgumentTypeMismatchException.class})
+    public ResponseEntity<ErrorResponse> handleInvalidRequest(Exception exception) {
+        return error(ErrorCode.VALIDATION_ERROR, "Invalid request parameter");
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public ResponseEntity<ErrorResponse> handleAccessDenied(AccessDeniedException exception) {
+        return error(ErrorCode.FORBIDDEN_CONVERSATION, "Access denied");
+    }
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ErrorResponse> handleAuthentication(AuthenticationException exception) {
+        return error(ErrorCode.UNAUTHENTICATED, ErrorCode.UNAUTHENTICATED.getMessage());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ErrorResponse> handleDataIntegrity(DataIntegrityViolationException exception) {
+        log.warn("Database constraint violation", exception);
+        return error(ErrorCode.INVALID_CONVERSATION, "The request conflicts with existing data");
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
@@ -67,15 +95,19 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(response);
     }
 
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<ErrorResponse> handleException(Exception exception) {
+        log.error("Unhandled application error", exception);
+        return error(ErrorCode.INTERNAL_ERROR, ErrorCode.INTERNAL_ERROR.getMessage());
+    }
 
-//    @ExceptionHandler(Exception.class)
-//    public ResponseEntity<ErrorResponse> handleException(Exception e) {
-//        ErrorResponse response = ErrorResponse.builder()
-//                .code(ErrorCode.INTERNAL_ERROR.getCode())
-//                .message(ErrorCode.INTERNAL_ERROR.getMessage())
-//                .status(ErrorCode.INTERNAL_ERROR.getStatus().value())
-//                .timestamp(LocalDateTime.now())
-//                .build();
-//        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
-//    }
+    private ResponseEntity<ErrorResponse> error(ErrorCode errorCode, String message) {
+        ErrorResponse response = ErrorResponse.builder()
+                .code(errorCode.getCode())
+                .message(message)
+                .status(errorCode.getStatus().value())
+                .timestamp(LocalDateTime.now())
+                .build();
+        return ResponseEntity.status(errorCode.getStatus()).body(response);
+    }
 }
