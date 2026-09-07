@@ -1,0 +1,42 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:chat_test;MODE=MySQL;DB_CLOSE_DELAY=-1;DATABASE_TO_LOWER=TRUE;NON_KEYWORDS=USER
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: false
+    open-in-view: false
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      repositories:
+        enabled: false
+  mail:
+    host: localhost
+    port: 2525
+    username: test
+    password: test
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-client-id
+            client-secret: test-client-secret
+            scope:
+              - email
+              - profile
+
+jwt:
+  access-key: test-access-key-must-be-at-least-32-bytes-long
+  refresh-key: test-refresh-key-must-be-at-least-32-bytes-long
+  access-expiration-minutes: 15
+  refresh-expiration-days: 30
+
+app:
+  oauth2:
+    redirect-uri: http://localhost:3000/oauth2/callback
