@@ -13,11 +13,15 @@ import java.util.UUID;
 
 public interface MessageRepository extends JpaRepository<Message, UUID> {
 
-    @EntityGraph(attributePaths = {"sender", "replyToMessage", "replyToMessage.sender"})
+    @EntityGraph(attributePaths = {
+            "sender",
+            "attachments",
+            "replyToMessage",
+            "replyToMessage.sender"
+    })
     @Query("""
             select distinct m from Message m
             where m.conversation.id = :conversationId
-              and m.deletedAt is null
               and (:beforeSequence is null or m.sequence < :beforeSequence)
             order by m.sequence desc
             """)
