@@ -60,6 +60,7 @@ services:
       MEDIA_MAX_FILE_SIZE: ${MEDIA_MAX_FILE_SIZE:-10MB}
       JPA_DDL_AUTO: ${JPA_DDL_AUTO:-update}
       JPA_SHOW_SQL: "false"
+      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
 
 volumes:
   mysql-data:
