@@ -39,6 +39,11 @@ public enum ErrorCode {
     MESSAGE_NOT_FOUND(HttpStatus.NOT_FOUND, "MESSAGE_NOT_FOUND", "Message not found"),
     INVALID_MESSAGE(HttpStatus.BAD_REQUEST, "INVALID_MESSAGE", "Message content is required"),
 
+    // Media
+    INVALID_MEDIA(HttpStatus.BAD_REQUEST, "INVALID_MEDIA", "Only supported image files can be uploaded"),
+    MEDIA_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "MEDIA_TOO_LARGE", "Image exceeds the upload size limit"),
+    MEDIA_UPLOAD_UNAVAILABLE(HttpStatus.SERVICE_UNAVAILABLE, "MEDIA_UPLOAD_UNAVAILABLE", "Image upload is unavailable"),
+
     // Common
     VALIDATION_ERROR(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Validation failed"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Internal server error"),
