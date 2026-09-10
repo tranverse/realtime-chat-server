@@ -22,15 +22,18 @@ public record ChatMessageResponse(
         Instant updatedAt
 ) {
     public static ChatMessageResponse from(Message message) {
+        boolean deleted = message.isDeleted();
         return new ChatMessageResponse(
                 message.getId(),
                 message.getConversation().getId(),
-                message.getContent(),
+                deleted ? null : message.getContent(),
                 message.getType(),
                 message.getSequence(),
                 UserSummaryResponse.from(message.getSender()),
                 ReplyMessageResponse.from(message.getReplyToMessage()),
-                message.getAttachments().stream().map(AttachmentResponse::from).toList(),
+                deleted
+                        ? List.of()
+                        : message.getAttachments().stream().map(AttachmentResponse::from).toList(),
                 message.getEditedAt(),
                 message.getCreatedAt(),
                 message.getUpdatedAt()
