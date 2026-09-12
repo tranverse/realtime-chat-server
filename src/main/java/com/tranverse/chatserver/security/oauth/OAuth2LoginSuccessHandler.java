@@ -2,6 +2,7 @@ package com.tranverse.chatserver.security.oauth;
 
 import com.tranverse.chatserver.dto.response.auth.AuthResponse;
 import com.tranverse.chatserver.service.AuthService;
+import com.tranverse.chatserver.service.OAuth2ExchangeService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -20,6 +21,7 @@ import java.io.IOException;
 @RequiredArgsConstructor
 public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
     private final AuthService authService;
+    private final OAuth2ExchangeService oAuth2ExchangeService;
 
     @Value("${app.oauth2.redirect-uri}")
     private String redirectUri;
@@ -32,10 +34,10 @@ public class OAuth2LoginSuccessHandler implements AuthenticationSuccessHandler {
         OAuth2User principal = token.getPrincipal();
 
         AuthResponse authResponse = authService.loginWithGoogle(principal);
+        String code = oAuth2ExchangeService.issue(authResponse);
 
         String targetUrl = UriComponentsBuilder.fromUriString(redirectUri)
-                .queryParam("accessToken", authResponse.getAccessToken())
-                .queryParam("refreshToken", authResponse.getRefreshToken())
+                .queryParam("code", code)
                 .build().toUriString();
         response.sendRedirect(targetUrl);
     }
