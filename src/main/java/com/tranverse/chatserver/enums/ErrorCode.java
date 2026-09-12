@@ -18,6 +18,7 @@ public enum ErrorCode {
     REGISTER_CODE_TOO_MANY_ATTEMPTS(HttpStatus.TOO_MANY_REQUESTS, "AUTH_REGISTER_CODE_TOO_MANY_ATTEMPTS", "Too many attempts"),
     INVALID_REGISTER_CODE(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_REGISTER_CODE", "Invalid register code"),
     INVALID_OAUTH2_USER(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_OAUTH2_USER", "Invalid oauth2 user"),
+    INVALID_OAUTH2_CODE(HttpStatus.UNAUTHORIZED, "AUTH_INVALID_OAUTH2_CODE", "OAuth2 login code is invalid or expired"),
     GOOGLE_EMAIL_NOT_VERIFIED(HttpStatus.BAD_REQUEST, "GOOGLE_EMAIL_NOT_VERIFIED", "Google account email is not verified"),    // User
     USER_NOT_FOUND(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found"),
     USERNAME_ALREADY_EXISTS(HttpStatus.CONFLICT, "USERNAME_ALREADY_EXISTS", "Username already exists"),

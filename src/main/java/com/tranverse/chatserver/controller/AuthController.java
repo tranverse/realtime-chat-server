@@ -6,6 +6,7 @@ import com.tranverse.chatserver.dto.response.auth.AuthResponse;
 import com.tranverse.chatserver.dto.response.auth.MessageResponse;
 import com.tranverse.chatserver.dto.response.auth.VerifyResetCodeResponse;
 import com.tranverse.chatserver.service.AuthService;
+import com.tranverse.chatserver.service.OAuth2ExchangeService;
 import com.tranverse.chatserver.utils.ClientIpUtils;
 import com.tranverse.chatserver.utils.SecurityUtils;
 import io.swagger.v3.oas.annotations.Operation;
@@ -28,6 +29,18 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 public class AuthController {
     private final AuthService authService;
+    private final OAuth2ExchangeService oAuth2ExchangeService;
+
+    @PostMapping("/oauth2/exchange")
+    @Operation(summary = "Exchange OAuth2 login code", description = "Exchange a short-lived, single-use code for application tokens")
+    public ResponseEntity<ApiResponse<AuthResponse>> exchangeOAuth2Code(
+            @Valid @RequestBody OAuth2CodeExchangeRequest request) {
+        return ResponseEntity.ok(ApiResponse.<AuthResponse>builder()
+                .code(HttpStatus.OK.value())
+                .message("Google login successfully")
+                .data(oAuth2ExchangeService.exchange(request.code()))
+                .build());
+    }
 
     @PostMapping("/login")
     @Operation(summary = "Login", description = "Login by email and password, and return accessToken and RefreshToken")
