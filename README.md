@@ -1,108 +1,109 @@
 # Realtime Chat Server
 
-Backend monolith cho ứng dụng chat realtime, xây dựng bằng Java 21, Spring Boot 4,
-MySQL, Redis, JWT, Google OAuth2 và STOMP/WebSocket.
+Backend modular monolith for a realtime chat application, built with Java 21, Spring Boot 4,
+MySQL, Redis, JWT, Google OAuth2, Cloudinary, and STOMP/WebSocket.
 
-Đây là **modular monolith**, không phải microservice. Một Spring Boot application chứa
-toàn bộ business module và được deploy như một đơn vị.
+This is a **modular monolith**, not a microservice system. A single Spring Boot application
+contains all business modules and is deployed as one unit.
 
-Tài liệu chi tiết:
+Detailed documentation:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API contract](docs/API.md)
 - [Deployment](docs/DEPLOYMENT.md)
 - [Portfolio / interview notes](docs/PORTFOLIO.md)
 
-## Chức năng MVP
+## MVP features
 
-- Đăng ký bằng OTP email, đăng nhập, refresh-token rotation, logout và đặt lại mật khẩu.
-- Đăng nhập Google OAuth2.
-- Xem/cập nhật hồ sơ và tìm kiếm người dùng.
-- Tạo chat riêng hoặc nhóm; quản lý thành viên, admin và chủ nhóm.
-- Link mời có thời hạn, tùy chọn yêu cầu quản trị viên phê duyệt.
-- Gửi/chỉnh sửa tin nhắn text/image/file, reply, xóa mềm, lịch sử dạng cursor và read receipt.
-- Typing indicator realtime.
-- Realtime event qua STOMP/WebSocket; xác thực JWT khi CONNECT và kiểm tra thành viên khi SUBSCRIBE.
+- Email OTP registration, login, refresh-token rotation, logout, and password recovery.
+- Google OAuth2 login with a short-lived, single-use code exchange.
+- User profile management and user search.
+- Private and group conversations with member, admin, and owner roles.
+- Expiring invitation links with optional administrator approval.
+- Text and image messages, replies, editing, soft deletion, cursor history, and read receipts.
+- Realtime typing and message events over STOMP/WebSocket.
+- JWT authentication on CONNECT and membership authorization on SUBSCRIBE.
 
-## Chạy local
+## Local development
 
-Yêu cầu: Java 21, MySQL 8 và Redis.
+Requirements: Java 21, MySQL 8, and Redis.
 
-1. Sao chép `.env.example` thành `.env` rồi điền cấu hình thật.
-2. Khởi động MySQL và Redis.
-3. Chạy:
+1. Copy `.env.example` to `.env` and provide the required configuration.
+2. Start MySQL and Redis.
+3. Run:
 
 ```powershell
 .\mvnw.cmd spring-boot:run
 ```
 
-Server mặc định chạy tại `http://localhost:8080`. Swagger UI ở
+The server starts at `http://localhost:8080` by default. Swagger UI is available at
 `http://localhost:8080/swagger-ui.html`.
 
-Hoặc chạy toàn bộ monolith + MySQL + Redis:
+Alternatively, start the monolith, MySQL, and Redis with Docker Compose:
 
 ```powershell
 docker compose up --build -d
 ```
 
-## REST API chính
+## Main REST API
 
-Tất cả API bên dưới, trừ `/api/v1/auth/**`, yêu cầu header
+All endpoints below, except public authentication endpoints, require the header
 `Authorization: Bearer <access-token>`.
 
-| Method | Endpoint | Mục đích |
+| Method | Endpoint | Purpose |
 | --- | --- | --- |
-| POST | `/api/v1/auth/login` | Đăng nhập |
-| POST | `/api/v1/auth/register` | Gửi OTP đăng ký |
-| POST | `/api/v1/auth/register/verify` | Xác thực OTP và tạo tài khoản |
-| POST | `/api/v1/auth/refresh` | Rotate refresh token |
-| POST | `/api/v1/auth/logout-all` | Thu hồi phiên trên mọi thiết bị |
-| GET | `/api/v1/users/me` | Hồ sơ hiện tại |
-| PATCH | `/api/v1/users/me` | Cập nhật hồ sơ |
-| GET | `/api/v1/users/search?q=` | Tìm người dùng |
-| GET/POST | `/api/v1/conversations` | Danh sách/tạo hội thoại |
-| GET/PATCH | `/api/v1/conversations/{id}` | Chi tiết/cập nhật nhóm |
-| POST | `/api/v1/conversations/{id}/members` | Thêm thành viên |
-| DELETE | `/api/v1/conversations/{id}/members/{userId}` | Xóa thành viên |
-| PATCH | `/api/v1/conversations/{id}/members/{userId}/role` | Đổi MEMBER/ADMIN |
-| POST | `/api/v1/conversations/{id}/transfer-ownership` | Chuyển chủ nhóm |
-| POST | `/api/v1/conversations/{id}/invite-links` | Tạo link mời |
-| POST | `/api/v1/conversations/invite-links/{code}/join` | Tham gia bằng link |
-| GET | `/api/v1/conversations/{id}/messages` | Lịch sử tin nhắn |
-| POST | `/api/v1/conversations/{id}/messages` | Gửi tin nhắn |
-| POST | `/api/v1/conversations/{id}/read` | Cập nhật read receipt |
-| PATCH | `/api/v1/messages/{messageId}` | Chỉnh sửa tin nhắn |
-| DELETE | `/api/v1/messages/{messageId}` | Xóa mềm tin nhắn |
+| POST | `/api/v1/auth/login` | Sign in |
+| POST | `/api/v1/auth/register` | Send a registration OTP |
+| POST | `/api/v1/auth/register/verify` | Verify the OTP and create an account |
+| POST | `/api/v1/auth/oauth2/exchange` | Exchange a one-time OAuth2 code |
+| POST | `/api/v1/auth/refresh` | Rotate the refresh token |
+| POST | `/api/v1/auth/logout-all` | Revoke every active session |
+| GET | `/api/v1/users/me` | Get the current profile |
+| PATCH | `/api/v1/users/me` | Update the current profile |
+| GET | `/api/v1/users/search?q=` | Search for users |
+| GET/POST | `/api/v1/conversations` | List or create conversations |
+| GET/PATCH | `/api/v1/conversations/{id}` | Read or update a conversation |
+| POST | `/api/v1/conversations/{id}/members` | Add members |
+| DELETE | `/api/v1/conversations/{id}/members/{userId}` | Remove a member |
+| PATCH | `/api/v1/conversations/{id}/members/{userId}/role` | Change a member role |
+| POST | `/api/v1/conversations/{id}/transfer-ownership` | Transfer group ownership |
+| POST | `/api/v1/conversations/{id}/invite-links` | Create an invitation link |
+| POST | `/api/v1/conversations/invite-links/{code}/join` | Join through an invitation |
+| GET | `/api/v1/conversations/{id}/messages` | Load cursor-based message history |
+| POST | `/api/v1/conversations/{id}/messages` | Send a message |
+| POST | `/api/v1/conversations/{id}/read` | Update the read receipt |
+| PATCH | `/api/v1/messages/{messageId}` | Edit a message |
+| DELETE | `/api/v1/messages/{messageId}` | Soft-delete a message |
 
 ## WebSocket/STOMP
 
-- Handshake endpoint: `/ws` (native WebSocket hoặc SockJS).
+- Handshake endpoint: `/ws` (native WebSocket or SockJS).
 - CONNECT native header: `Authorization: Bearer <access-token>`.
-- Client gửi tin: `/app/conversations/{conversationId}/messages`.
-- Client cập nhật đã đọc: `/app/conversations/{conversationId}/read`.
-- Client gửi typing indicator: `/app/conversations/{conversationId}/typing`.
-- Subscribe event: `/topic/conversations/{conversationId}`.
-- Subscribe lỗi cá nhân: `/user/queue/errors`.
+- Send messages: `/app/conversations/{conversationId}/messages`.
+- Mark messages as read: `/app/conversations/{conversationId}/read`.
+- Publish typing state: `/app/conversations/{conversationId}/typing`.
+- Subscribe to conversation events: `/topic/conversations/{conversationId}`.
+- Subscribe to personal errors: `/user/queue/errors`.
 
-Payload gửi tin:
+Message payload:
 
 ```json
 {
-  "content": "Xin chào",
+  "content": "Hello",
   "type": "TEXT",
   "replyToMessageId": null,
   "attachments": []
 }
 ```
 
-Server phát các event `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`,
-`MESSAGES_READ` và `TYPING`.
+The server publishes `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`,
+`MESSAGES_READ`, and `TYPING` events.
 
-## Kiểm thử
+## Testing
 
 ```powershell
 .\mvnw.cmd test
 ```
 
-Trong môi trường production, đặt `JPA_DDL_AUTO=validate` và quản lý thay đổi schema
-bằng migration trước khi triển khai.
+In production, set `JPA_DDL_AUTO=validate` and manage schema changes through reviewed
+Flyway migrations before deployment.
