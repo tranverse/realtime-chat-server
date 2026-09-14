@@ -1,8 +1,10 @@
-# Deploy modular monolith
+# Local containerization reference
+
+This document covers local Docker packaging and execution only.
 
 ## Topology
 
-Một lần deploy gồm ba container:
+Môi trường local gồm ba container:
 
 ```mermaid
 flowchart TB
@@ -45,23 +47,10 @@ MySQL và Redis dùng named volume `mysql-data`, `redis-data`. Không dùng
 | `GG_CLIENT_ID` / `GG_CLIENT_SECRET` | Có khi dùng Google login | OAuth2 credential |
 | `OAUTH2_REDIRECT_URI` | Có | Frontend callback URL |
 | `CORS_ALLOWED_ORIGINS` | Có | Danh sách frontend origin, phân cách bằng dấu phẩy |
-| `JPA_DDL_AUTO` | Không | `update` cho demo; `validate` cho production có migration |
+| `JPA_DDL_AUTO` | Không | Mặc định `update` cho môi trường local |
 | `APP_PORT` | Không | Host port, mặc định 8080 |
 
 Không commit `.env`. `.env.example` chỉ chứa placeholder.
-
-## Production checklist
-
-- Đặt application sau reverse proxy có TLS; forward WebSocket upgrade headers.
-- Dùng secret manager của nền tảng thay vì lưu credential trong compose file.
-- Đặt `JPA_DDL_AUTO=validate` sau khi bổ sung migration cho database production.
-- Dùng managed MySQL với backup/PITR và managed Redis nếu deploy public.
-- Chỉ expose port ứng dụng; không publish MySQL/Redis ra Internet.
-- Giới hạn CORS theo domain frontend thay cho wildcard.
-- Theo dõi `/actuator/health`; endpoint không hiển thị chi tiết nội bộ.
-- Rotate JWT keys theo quy trình buộc đăng nhập lại.
-- Đặt memory/CPU limit và theo dõi JVM heap; Docker image dùng
-  `MaxRAMPercentage=75`.
 
 ## CI
 

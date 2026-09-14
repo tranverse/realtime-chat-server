@@ -41,6 +41,7 @@ Validation, UUID sai định dạng, authentication, authorization và database 
 | POST | `/auth/register/verify` | Không | Xác thực OTP và tạo tài khoản |
 | POST | `/auth/register/resend` | Không | Gửi lại OTP |
 | POST | `/auth/login` | Không | Nhận access/refresh token |
+| POST | `/auth/oauth2/exchange` | Không | Đổi OAuth code dùng một lần thành access/refresh token |
 | POST | `/auth/refresh` | Không | Rotate refresh token |
 | POST | `/auth/logout` | Không | Thu hồi refresh token được gửi lên |
 | POST | `/auth/logout-all` | Có | Thu hồi mọi phiên của current user |
@@ -48,6 +49,14 @@ Validation, UUID sai định dạng, authentication, authorization và database 
 | POST | `/auth/forgot-password/verify` | Không | Đổi OTP thành reset token ngắn hạn |
 | POST | `/auth/reset-password` | Không | Đặt mật khẩu mới |
 | GET | `/oauth2/authorization/google` | Không | Bắt đầu Google OAuth2 |
+
+## Media
+
+| Method | Path | Auth | Chức năng |
+| --- | --- | --- | --- |
+| POST | `/media/images` | Có | Upload JPEG, PNG, WebP hoặc GIF lên Cloudinary |
+
+Image upload dùng `multipart/form-data` với field `file`, giới hạn mặc định 10 MB.
 
 ## User
 

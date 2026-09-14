@@ -4,7 +4,7 @@
 
 Realtime Chat Server là một **modular monolith**: toàn bộ nghiệp vụ được đóng gói và
 deploy dưới dạng một Spring Boot application. MySQL lưu dữ liệu bền vững, Redis phục
-vụ rate limiting OTP, còn STOMP simple broker xử lý realtime trong cùng process.
+vụ rate limiting OTP và OAuth exchange code dùng một lần, còn STOMP simple broker xử lý realtime trong cùng process.
 
 Thiết kế này phù hợp với MVP và portfolio vì dễ chạy, dễ debug, transaction nhất quán
 và không tạo chi phí vận hành của hệ phân tán. Dự án không giả lập microservice bằng
@@ -154,8 +154,9 @@ transaction commit để client không nhận một message sau đó bị rollba
 
 Simple broker là lựa chọn có chủ ý cho một monolith instance. Khi cần chạy nhiều
 instance, có thể thay bằng broker relay (RabbitMQ) và shared presence mà không tách
-business service. File attachment hiện nhận URL/metadata; binary nên được upload trực
-tiếp lên object storage bằng pre-signed URL để application không trở thành file server.
+business service. Image binary hiện được gửi multipart qua endpoint có xác thực và
+backend upload lên Cloudinary. Pre-signed upload có thể là cải tiến tương lai nếu cần
+giảm tải băng thông cho application.
 
 Các chức năng chưa thuộc MVP: reaction, pin/search full-text, push notification,
 voice/video call và end-to-end encryption. Chúng được ghi trong roadmap thay vì thêm

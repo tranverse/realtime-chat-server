@@ -7,8 +7,8 @@
 Thiết kế và triển khai modular monolith cho ứng dụng chat realtime: JWT/OAuth2,
 refresh-token rotation và reuse detection, OTP rate limiting, chat riêng/nhóm,
 role-based membership, link mời có phê duyệt, cursor pagination, read receipt và
-STOMP/WebSocket authorization. Đóng gói bằng Docker Compose và kiểm thử tự động qua
-GitHub Actions.
+STOMP/WebSocket authorization. Cung cấp cấu hình chạy local bằng Docker Compose và
+kiểm thử tự động qua GitHub Actions.
 
 ## Điểm kỹ thuật nên trình bày khi phỏng vấn
 
@@ -37,13 +37,14 @@ GitHub Actions.
 
 ## Giới hạn được chủ động giữ ngoài MVP
 
-- Attachment binary upload: API nhận URL/metadata để ghép với object storage; không
-  biến monolith thành file server.
-- Simple broker: phù hợp single-instance deploy. Multi-instance cần broker relay.
+- Image upload: frontend gửi multipart có xác thực đến backend; backend kiểm tra file,
+  upload lên Cloudinary và lưu metadata attachment cùng message.
+- Simple broker: phù hợp một application instance. Multi-instance cần broker relay.
 - Reaction, pin, full-text search, push notification và call là roadmap, không phải
   yêu cầu lõi để chứng minh backend fundamentals.
-- Production schema nên dùng Flyway/Liquibase; `ddl-auto=update` chỉ dùng demo/local.
+- Schema hiện dùng Hibernate update cùng các Flyway repair migration có phạm vi hẹp;
+  chưa có baseline migration đầy đủ cho database mới.
 
-Việc nêu rõ trade-off quan trọng hơn tuyên bố dự án "production-ready" tuyệt đối.
-Repository thể hiện một MVP có thể chạy, kiểm thử và deploy, đồng thời ghi lại giới hạn
-thực tế.
+Việc nêu rõ trade-off quan trọng hơn phóng đại mức độ hoàn thiện của dự án.
+Repository thể hiện một MVP có thể chạy local và kiểm thử, đồng thời ghi lại giới hạn
+thực tế. Public hosting nằm ngoài phạm vi đã được xác minh.
