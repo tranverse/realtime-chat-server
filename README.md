@@ -4,13 +4,13 @@ Backend modular monolith for a realtime chat application, built with Java 21, Sp
 MySQL, Redis, JWT, Google OAuth2, Cloudinary, and STOMP/WebSocket.
 
 This is a **modular monolith**, not a microservice system. A single Spring Boot application
-contains all business modules and is deployed as one unit.
+contains all business modules and runs as one backend process.
 
 Detailed documentation:
 
 - [Architecture](docs/ARCHITECTURE.md)
 - [API contract](docs/API.md)
-- [Deployment](docs/DEPLOYMENT.md)
+- [Local containerization reference](docs/CONTAINERIZATION.md)
 - [Portfolio / interview notes](docs/PORTFOLIO.md)
 
 ## MVP features
@@ -39,7 +39,7 @@ Requirements: Java 21, MySQL 8, and Redis.
 The server starts at `http://localhost:8080` by default. Swagger UI is available at
 `http://localhost:8080/swagger-ui.html`.
 
-Alternatively, start the monolith, MySQL, and Redis with Docker Compose:
+Alternatively, run the monolith, MySQL, and Redis locally with Docker Compose:
 
 ```powershell
 docker compose up --build -d
@@ -105,5 +105,6 @@ The server publishes `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`,
 .\mvnw.cmd test
 ```
 
-In production, set `JPA_DDL_AUTO=validate` and manage schema changes through reviewed
-Flyway migrations before deployment.
+The current MVP uses Hibernate schema updates together with targeted Flyway repair
+migrations. A complete baseline migration is not yet included, so do not switch a fresh
+database to `JPA_DDL_AUTO=validate` without adding and verifying that baseline first.
