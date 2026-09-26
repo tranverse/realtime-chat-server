@@ -105,6 +105,10 @@ The server publishes `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`,
 .\mvnw.cmd test
 ```
 
+The suite combines isolated JUnit/Mockito tests with Spring Boot + MockMvc integration
+tests that exercise HTTP endpoints, security, JWT authentication, services, and H2-backed
+persistence together.
+
 The current MVP uses Hibernate schema updates together with targeted Flyway repair
 migrations. A complete baseline migration is not yet included, so do not switch a fresh
 database to `JPA_DDL_AUTO=validate` without adding and verifying that baseline first.
