@@ -125,9 +125,7 @@ public class MessageService {
                 .filter(candidate -> candidate.getConversation().getId().equals(conversationId))
                 .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
 
-        if (member.getLastReadMessage() == null
-                || message.getSequence() > member.getLastReadMessage().getSequence()) {
-            member.updateLastReadMessage(message);
+        if (conversationService.advanceLastReadIfNewer(member.getId(), message)) {
             ChatEventResponse event = ChatEventResponse.read(
                     conversationId, userId, message.getId(), message.getSequence());
             publishAfterCommit(event);

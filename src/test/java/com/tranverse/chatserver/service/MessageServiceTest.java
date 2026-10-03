@@ -163,13 +163,33 @@ class MessageServiceTest {
         newer.setId(UUID.randomUUID());
         when(conversationService.requireActiveMember(conversationId, userId)).thenReturn(member);
         when(messageRepository.findByIdAndDeletedAtIsNull(newer.getId())).thenReturn(Optional.of(newer));
+        when(conversationService.advanceLastReadIfNewer(member.getId(), newer)).thenReturn(true);
 
         messageService.markRead(userId, conversationId, new ReadConversationRequest(newer.getId()));
 
-        assertSame(newer, member.getLastReadMessage());
-        assertNotNull(member.getLastReadAt());
+        verify(conversationService).advanceLastReadIfNewer(member.getId(), newer);
         verify(messagingTemplate).convertAndSend(
                 eq("/topic/conversations/" + conversationId), any(ChatEventResponse.class));
+    }
+
+    @Test
+    void markReadDoesNotPublishWhenWatermarkDoesNotAdvance() {
+        UUID userId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
+        User user = user(userId);
+        Conversation conversation = Conversation.create("Test", ConversationType.GROUP, 10, null);
+        conversation.setId(conversationId);
+        ConversationMember member = ConversationMember.create(
+                conversation, user, ConversationMemberRole.MEMBER, JoinMethod.INVITATION, null);
+        Message message = Message.create("Already read", MessageType.TEXT, 9L, conversation, user, null);
+        message.setId(UUID.randomUUID());
+        when(conversationService.requireActiveMember(conversationId, userId)).thenReturn(member);
+        when(messageRepository.findByIdAndDeletedAtIsNull(message.getId())).thenReturn(Optional.of(message));
+        when(conversationService.advanceLastReadIfNewer(member.getId(), message)).thenReturn(false);
+
+        messageService.markRead(userId, conversationId, new ReadConversationRequest(message.getId()));
+
+        verify(messagingTemplate, never()).convertAndSend(anyString(), any(ChatEventResponse.class));
     }
 
     private User user(UUID id) {

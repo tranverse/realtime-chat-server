@@ -352,6 +352,15 @@ public class ConversationService {
                 .orElseThrow(() -> new AppException(ErrorCode.FORBIDDEN_CONVERSATION));
     }
 
+    @Transactional
+    public boolean advanceLastReadIfNewer(UUID memberId, Message message) {
+        return memberRepository.advanceLastReadIfNewer(
+                memberId,
+                message,
+                message.getSequence(),
+                Instant.now()) == 1;
+    }
+
     private Conversation getActiveConversation(UUID conversationId) {
         return conversationRepository.findByIdAndDeletedAtIsNull(conversationId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_NOT_FOUND));
