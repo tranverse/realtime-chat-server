@@ -6,6 +6,7 @@ import com.tranverse.chatserver.enums.SystemRole;
 import com.tranverse.chatserver.repository.RefreshTokenRepository;
 import com.tranverse.chatserver.repository.UserRepository;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.BeforeEach;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
@@ -13,11 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -25,7 +26,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@Transactional
 class AuthenticationFlowIntegrationTest {
     @Autowired
     MockMvc mockMvc;
@@ -38,6 +38,12 @@ class AuthenticationFlowIntegrationTest {
 
     @Autowired
     PasswordEncoder passwordEncoder;
+
+    @BeforeEach
+    void cleanDatabase() {
+        refreshTokenRepository.deleteAll();
+        userRepository.deleteAll();
+    }
 
     @Test
     void loginPersistsSessionAndAccessTokenAuthorizesProfileRequest() throws Exception {
@@ -122,6 +128,17 @@ class AuthenticationFlowIntegrationTest {
                                 """.formatted(originalRefreshToken)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("TOKEN_REUSE_DETECTED"));
+
+        assertEquals(2, refreshTokenRepository.count());
+        assertTrue(refreshTokenRepository.findAll().stream().allMatch(token -> token.isRevoked()));
+
+        mockMvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(rotatedRefreshToken)))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("AUTH_INVALID_TOKEN"));
     }
 
     @Test

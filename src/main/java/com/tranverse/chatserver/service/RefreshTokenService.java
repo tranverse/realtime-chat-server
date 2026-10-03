@@ -1,6 +1,5 @@
 package com.tranverse.chatserver.service;
 
-import com.nimbusds.jwt.SignedJWT;
 import com.tranverse.chatserver.entity.RefreshToken;
 import com.tranverse.chatserver.entity.User;
 import com.tranverse.chatserver.enums.ErrorCode;
@@ -26,6 +25,7 @@ public class RefreshTokenService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtProperties jwtProperties;
     private final HashTokenUtil hashTokenUtil;
+    private final RefreshTokenFamilyRevocationService familyRevocationService;
     public String createAndSave(User user) {
         return createAndSave(user, UUID.randomUUID());
     }
@@ -65,10 +65,7 @@ public class RefreshTokenService {
 
         if(refreshToken.isRevoked()){
             if(RefreshTokenRevokedReason.ROTATED.equals(refreshToken.getRevokedReason())){
-                refreshTokenRepository.revokeActiveByFamilyId(
-                        RefreshTokenRevokedReason.REUSE_DETECTED,
-                        refreshToken.getFamilyId(),
-                        Instant.now());
+                familyRevocationService.revokeActiveFamilyForReuse(refreshToken.getFamilyId());
                 throw new AppException(ErrorCode.TOKEN_REUSE_DETECTED);
             }
             throw new AppException(ErrorCode.INVALID_TOKEN);

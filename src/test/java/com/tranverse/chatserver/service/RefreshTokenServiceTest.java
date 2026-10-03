@@ -39,6 +39,8 @@ class RefreshTokenServiceTest {
     RefreshTokenRepository repository;
     @Mock
     HashTokenUtil hashTokenUtil;
+    @Mock
+    RefreshTokenFamilyRevocationService familyRevocationService;
 
     RefreshTokenService service;
 
@@ -48,7 +50,8 @@ class RefreshTokenServiceTest {
                 jwtService,
                 repository,
                 new JwtProperties("access", "refresh", 15, 30),
-                hashTokenUtil);
+                hashTokenUtil,
+                familyRevocationService);
         when(hashTokenUtil.sha256(RAW_TOKEN)).thenReturn(HASH);
     }
 
@@ -89,10 +92,7 @@ class RefreshTokenServiceTest {
                 () -> service.verifyForRotation(RAW_TOKEN));
 
         assertEquals(ErrorCode.TOKEN_REUSE_DETECTED, exception.getErrorCode());
-        verify(repository).revokeActiveByFamilyId(
-                org.mockito.ArgumentMatchers.eq(RefreshTokenRevokedReason.REUSE_DETECTED),
-                org.mockito.ArgumentMatchers.eq(token.getFamilyId()),
-                any(Instant.class));
+        verify(familyRevocationService).revokeActiveFamilyForReuse(token.getFamilyId());
     }
 
     @Test
