@@ -6,7 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $compose = Join-Path $root 'compose.yml'
-$results = Join-Path $root 'results'
+$results = Join-Path $root 'results/after'
 $baseUrl = 'http://localhost:18082/api/v1'
 
 New-Item -ItemType Directory -Force -Path $results | Out-Null
@@ -80,7 +80,7 @@ try {
                 -e CONVERSATION_ID=$conversationId `
                 -e CONCURRENCY=$concurrency `
                 -e RUN_ID=$runId `
-                k6 run --console-output "/results/$consoleName" --summary-export "/results/$summaryName" /scripts/concurrent-send.k6.js
+                k6 run --console-output "/results/after/$consoleName" --summary-export "/results/after/$summaryName" /scripts/concurrent-send.k6.js
             if ($LASTEXITCODE -ne 0) { throw "k6 failed for $runId" }
 
             $lockAfterResult = Invoke-MySql "SHOW GLOBAL STATUS LIKE 'Innodb_row_lock_time';"

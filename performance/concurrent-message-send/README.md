@@ -10,4 +10,4 @@ Run from the backend repository root:
 
 Defaults: MySQL 8.4, 30-second warm-up at 5 VUs, concurrency levels 10/25/50/100, and three repetitions per level. Every repetition uses a new conversation and checks persisted MySQL sequences after k6 completes.
 
-Raw k6 summaries, failure logs, per-run verification, aggregated results, resource samples, and environment details are saved under `results/`. Docker database volumes are removed after the run. These are local pet-project measurements, not production capacity results.
+The original failing baseline is retained under `results/before/`. New runs write raw k6 summaries, failure logs, per-run verification, aggregated results, resource samples, and environment details under `results/after/`. Docker database volumes are removed after the run. These are local pet-project measurements, not production capacity results.
