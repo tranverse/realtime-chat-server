@@ -107,7 +107,41 @@ The server publishes `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`,
 
 The suite combines isolated JUnit/Mockito tests with Spring Boot + MockMvc integration
 tests that exercise HTTP endpoints, security, JWT authentication, services, and H2-backed
-persistence together.
+persistence together. A MySQL 8.4 Testcontainers regression test verifies concurrent
+same-conversation message sequence allocation with 10 and 25 threads.
+
+## Message-history pagination benchmark
+
+A controlled local MySQL 8.4/k6 benchmark compared sequence-based keyset pagination with
+offset pagination using 10 concurrent users and datasets of 10K, 100K, and 500K messages.
+At 500K messages and 90% page depth, keyset pagination measured approximately **17 ms p95**
+versus **4.38 s p95** for offset pagination. These local measurements validate the design
+choice; they are not production capacity or an SLA.
+
+See [FINAL_BACKEND_PORTFOLIO_REPORT.md](FINAL_BACKEND_PORTFOLIO_REPORT.md) for the verified
+result summary and portfolio-safe wording.
+
+## Concurrent message benchmark
+
+The local MySQL 8.4/k6 benchmark sent 10, 25, 50, and 100 messages concurrently to the
+same conversation. At the maximum tested level, all **100/100 sends succeeded** with zero
+failed requests, duplicate sequences, or missing sequences across three repetitions.
+Same-conversation writes intentionally serialize on a per-conversation pessimistic lock;
+different conversations lock different rows and can proceed independently.
+
+The benchmark also exposed and verified the correction of a transaction-ordering bug:
+
+```text
+Before: membership SELECT → snapshot → conversation lock → stale max(sequence)
+        → duplicate allocation → unique constraint rejection
+
+After:  conversation lock → membership check → sequence read → persist message
+```
+
+See [CONCURRENT_SEQUENCE_FIX_REPORT.md](CONCURRENT_SEQUENCE_FIX_REPORT.md) for the
+before/after results, MySQL regression coverage, and limitations. These results describe
+100 concurrent same-conversation sends in a local benchmark, not global or distributed
+production capacity.
 
 The current MVP uses Hibernate schema updates together with targeted Flyway repair
 migrations. A complete baseline migration is not yet included, so do not switch a fresh
