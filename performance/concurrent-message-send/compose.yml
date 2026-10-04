@@ -1,0 +1,65 @@
+services:
+  mysql:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: chat_application
+      MYSQL_ROOT_PASSWORD: benchmark-password
+    ports:
+      - "13308:3306"
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -pbenchmark-password --silent"]
+      interval: 3s
+      timeout: 5s
+      retries: 30
+
+  redis:
+    image: redis:7.4-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  backend:
+    build:
+      context: ../..
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "18082:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: benchmark
+      DB_URL: jdbc:mysql://mysql:3306/chat_application?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true
+      DB_USERNAME: root
+      DB_PASSWORD: benchmark-password
+      REDIS_HOST: redis
+      MAIL_USERNAME: benchmark
+      MAIL_PASSWORD: benchmark
+      GG_CLIENT_ID: benchmark-google-client
+      GG_CLIENT_SECRET: benchmark-google-secret
+      JWT_ACCESS_KEY: benchmark-access-key-must-be-at-least-32-bytes
+      JWT_REFRESH_KEY: benchmark-refresh-key-must-be-at-least-32-bytes
+      JWT_ACCESS_EXPIRATION_MINUTES: 120
+      JWT_REFRESH_EXPIRATION_DAYS: 1
+      JPA_DDL_AUTO: update
+      FLYWAY_ENABLED: "false"
+      MANAGEMENT_HEALTH_MAIL_ENABLED: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://127.0.0.1:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 5s
+      retries: 40
+      start_period: 20s
+
+  k6:
+    image: grafana/k6:0.57.0
+    profiles: [benchmark]
+    volumes:
+      - ./k6:/scripts:ro
+      - ./results:/results
+    depends_on:
+      backend:
+        condition: service_healthy

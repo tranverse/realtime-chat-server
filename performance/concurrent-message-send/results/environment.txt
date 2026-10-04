@@ -1,0 +1,13 @@
+Date: 2026-10-04T10:48:47.1517776+07:00
+OS: Microsoft Windows NT 10.0.26200.0
+CPU: 11th Gen Intel(R) Core(TM) i5-1155G7 @ 2.50GHz
+Logical processors: 8
+RAM bytes: 16867516416
+Java: java version "21.0.6" 2025-01-21 LTS
+Spring Boot: 4.0.6
+MySQL: 8.4
+Redis: 7.4
+Docker: 28.4.0
+Concurrency levels: 10, 25, 50, 100 sends
+Warm-up: 30s at 5 VUs
+Repetitions: 3
