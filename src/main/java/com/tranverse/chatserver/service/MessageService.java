@@ -55,9 +55,9 @@ public class MessageService {
                                     UUID conversationId,
                                     CreateMessageRequest request) {
         validateMessage(request);
-        conversationService.requireActiveMember(conversationId, userId);
         Conversation conversation = conversationRepository.findByIdForUpdate(conversationId)
                 .orElseThrow(() -> new AppException(ErrorCode.CONVERSATION_NOT_FOUND));
+        conversationService.requireActiveMember(conversationId, userId);
         User sender = userService.getActiveUser(userId);
 
         Message replyTo = null;
