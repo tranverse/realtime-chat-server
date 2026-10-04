@@ -15,6 +15,7 @@ import com.tranverse.chatserver.repository.ConversationRepository;
 import com.tranverse.chatserver.repository.MessageRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InOrder;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -77,6 +78,11 @@ class MessageServiceTest {
         assertEquals("Hello", response.content());
         assertNotNull(conversation.getLastMessage());
         assertEquals(8L, conversation.getLastMessage().getSequence());
+        InOrder sequenceAllocation = inOrder(conversationRepository, conversationService, messageRepository);
+        sequenceAllocation.verify(conversationRepository).findByIdForUpdate(conversationId);
+        sequenceAllocation.verify(conversationService).requireActiveMember(conversationId, userId);
+        sequenceAllocation.verify(messageRepository)
+                .findTopByConversationIdOrderBySequenceDesc(conversationId);
         verify(messagingTemplate).convertAndSend(
                 eq("/topic/conversations/" + conversationId),
                 any(ChatEventResponse.class)
