@@ -1,177 +1,85 @@
-# API contract
+# API Contract
 
-## Quy ước chung
-
-Base URL: `/api/v1`. REST API dùng JSON và access token:
-
-```http
-Authorization: Bearer <access-token>
-Content-Type: application/json
-```
-
-Response thành công:
-
-```json
-{
-  "code": 200,
-  "message": "Conversation retrieved successfully",
-  "data": {}
-}
-```
-
-Response lỗi:
-
-```json
-{
-  "status": 403,
-  "code": "CONVERSATION_FORBIDDEN",
-  "message": "You do not have permission in this conversation",
-  "timestamp": "2026-09-05T10:00:00"
-}
-```
-
-Validation, UUID sai định dạng, authentication, authorization và database conflict
-đều được ánh xạ thành HTTP status phù hợp; lỗi nội bộ không trả stack trace cho client.
+The REST base path is `/api/v1`. Protected endpoints require `Authorization: Bearer <access-token>`. OpenAPI documentation is available from `/swagger-ui.html` while the application is running.
 
 ## Authentication
 
-| Method | Path | Auth | Chức năng |
-| --- | --- | --- | --- |
-| POST | `/auth/register` | Không | Gửi OTP đăng ký |
-| POST | `/auth/register/verify` | Không | Xác thực OTP và tạo tài khoản |
-| POST | `/auth/register/resend` | Không | Gửi lại OTP |
-| POST | `/auth/login` | Không | Nhận access/refresh token |
-| POST | `/auth/oauth2/exchange` | Không | Đổi OAuth code dùng một lần thành access/refresh token |
-| POST | `/auth/refresh` | Không | Rotate refresh token |
-| POST | `/auth/logout` | Không | Thu hồi refresh token được gửi lên |
-| POST | `/auth/logout-all` | Có | Thu hồi mọi phiên của current user |
-| POST | `/auth/forgot-password` | Không | Gửi reset OTP |
-| POST | `/auth/forgot-password/verify` | Không | Đổi OTP thành reset token ngắn hạn |
-| POST | `/auth/reset-password` | Không | Đặt mật khẩu mới |
-| GET | `/oauth2/authorization/google` | Không | Bắt đầu Google OAuth2 |
-
-## Media
-
-| Method | Path | Auth | Chức năng |
-| --- | --- | --- | --- |
-| POST | `/media/images` | Có | Upload JPEG, PNG, WebP hoặc GIF lên Cloudinary |
-
-Image upload dùng `multipart/form-data` với field `file`, giới hạn mặc định 10 MB.
-
-## User
-
-| Method | Path | Chức năng |
+| Method | Path | Purpose |
 | --- | --- | --- |
-| GET | `/users/me` | Lấy hồ sơ current user |
-| PATCH | `/users/me` | Cập nhật name, username, avatar, phone, dob |
-| GET | `/users/search?q=&page=0&size=20` | Tìm theo name, username hoặc email |
+| POST | `/auth/register` | Send a registration OTP |
+| POST | `/auth/register/verify` | Verify the OTP and create the account |
+| POST | `/auth/register/resend` | Resend the registration OTP |
+| POST | `/auth/login` | Issue access and refresh tokens |
+| POST | `/auth/oauth2/exchange` | Consume a single-use OAuth2 exchange code |
+| POST | `/auth/refresh` | Rotate a refresh token |
+| POST | `/auth/logout` | Revoke the submitted refresh token |
+| POST | `/auth/logout-all` | Revoke all active sessions for the authenticated user |
+| POST | `/auth/forgot-password` | Send a password-reset OTP |
+| POST | `/auth/forgot-password/verify` | Exchange the OTP for a reset token |
+| POST | `/auth/reset-password` | Set a new password |
+| GET | `/oauth2/authorization/google` | Start Google OAuth2 login |
 
-## Conversation và membership
+## Users and Media
 
-Tạo chat riêng:
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/users/me` | Return the authenticated profile |
+| PATCH | `/users/me` | Update profile fields |
+| GET | `/users/search?q=&page=0&size=20` | Search users |
+| POST | `/media/images` | Validate and upload an image to Cloudinary |
+
+Image upload uses `multipart/form-data` with a `file` field. JPEG, PNG, WebP, and GIF are accepted up to the configured multipart limit (10 MB by default).
+
+## Conversations
+
+| Method | Path | Minimum authority |
+| --- | --- | --- |
+| GET | `/conversations?page=0&size=20` | Authenticated user |
+| POST | `/conversations` | Authenticated user |
+| GET | `/conversations/{id}` | Active member |
+| PATCH | `/conversations/{id}` | Group admin |
+| POST | `/conversations/{id}/members` | Group admin |
+| DELETE | `/conversations/{id}/members/{userId}` | Group admin |
+| PATCH | `/conversations/{id}/members/{userId}/role` | Group owner |
+| POST | `/conversations/{id}/transfer-ownership` | Group owner |
+| POST | `/conversations/{id}/leave` | Active member other than the owner |
+| POST | `/conversations/{id}/invite-links` | Group admin |
+| DELETE | `/conversations/{id}/invite-links/{linkId}` | Group admin |
+| POST | `/conversations/invite-links/{code}/join` | Authenticated user |
+| GET | `/conversations/{id}/join-requests` | Group admin |
+| POST | `/conversations/{id}/join-requests/{requestId}/review` | Group admin |
+
+`OWNER` has higher authority than `ADMIN`. An invitation with approval enabled creates a join request instead of adding the user immediately.
+
+## Messages
+
+| Method | Path | Purpose |
+| --- | --- | --- |
+| GET | `/conversations/{id}/messages?beforeSequence=&size=50` | Load newest-to-oldest keyset history |
+| POST | `/conversations/{id}/messages` | Persist and publish a message |
+| POST | `/conversations/{id}/read` | Advance the authenticated member's read watermark |
+| PATCH | `/messages/{messageId}` | Edit a message owned by the sender |
+| DELETE | `/messages/{messageId}` | Soft-delete as sender or authorized group manager |
+
+Example send request:
 
 ```json
 {
-  "type": "PRIVATE",
-  "memberIds": ["other-user-uuid"]
-}
-```
-
-Tạo group:
-
-```json
-{
-  "type": "GROUP",
-  "name": "Backend Team",
-  "memberIds": ["user-uuid-1", "user-uuid-2"],
-  "maxMembers": 100,
-  "avatar": null
-}
-```
-
-| Method | Path | Quyền tối thiểu |
-| --- | --- | --- |
-| GET | `/conversations?page=0&size=20` | MEMBER |
-| POST | `/conversations` | User đã đăng nhập |
-| GET | `/conversations/{id}` | MEMBER |
-| PATCH | `/conversations/{id}` | ADMIN |
-| POST | `/conversations/{id}/members` | ADMIN |
-| DELETE | `/conversations/{id}/members/{userId}` | ADMIN |
-| PATCH | `/conversations/{id}/members/{userId}/role` | OWNER |
-| POST | `/conversations/{id}/transfer-ownership` | OWNER |
-| POST | `/conversations/{id}/leave` | MEMBER, trừ OWNER |
-| POST | `/conversations/{id}/invite-links` | ADMIN |
-| DELETE | `/conversations/{id}/invite-links/{linkId}` | ADMIN |
-| POST | `/conversations/invite-links/{code}/join` | User đã đăng nhập |
-| GET | `/conversations/{id}/join-requests` | ADMIN |
-| POST | `/conversations/{id}/join-requests/{requestId}/review` | ADMIN |
-
-`OWNER` cao hơn `ADMIN`; ADMIN không thể xóa ADMIN khác hoặc đổi OWNER. Link mời có
-`requireApproval=true` trả join request thay vì thêm thành viên ngay.
-
-## Message
-
-| Method | Path | Chức năng |
-| --- | --- | --- |
-| GET | `/conversations/{id}/messages?beforeSequence=&size=50` | Lấy lịch sử mới đến cũ |
-| POST | `/conversations/{id}/messages` | Gửi và phát event realtime |
-| POST | `/conversations/{id}/read` | Đánh dấu đã đọc đến message |
-| PATCH | `/messages/{messageId}` | Sender chỉnh sửa nội dung |
-| DELETE | `/messages/{messageId}` | Sender hoặc group manager xóa mềm |
-
-Payload message:
-
-```json
-{
-  "content": "Thiết kế này ổn nhé",
+  "content": "Hello",
   "type": "TEXT",
   "replyToMessageId": null,
   "attachments": []
 }
 ```
 
-`IMAGE` và `FILE` phải có ít nhất một attachment:
-
-```json
-{
-  "content": "ERD",
-  "type": "IMAGE",
-  "attachments": [
-    {
-      "fileUrl": "https://object-storage.example/erd.png",
-      "fileType": "image/png",
-      "fileSize": 245100
-    }
-  ]
-}
-```
-
-Cursor `beforeSequence` tránh lỗi trùng/thiếu thường gặp khi dùng offset trong lúc
-conversation liên tục nhận message mới.
-
 ## STOMP/WebSocket
 
-Handshake tại `/ws`; hỗ trợ native WebSocket và SockJS.
+Connect to `/ws` using native WebSocket or SockJS and send `Authorization: Bearer <access-token>` in the STOMP `CONNECT` headers.
 
-1. CONNECT với native header `Authorization: Bearer <access-token>`.
-2. SUBSCRIBE `/topic/conversations/{conversationId}` để nhận event.
-3. SUBSCRIBE `/user/queue/errors` để nhận lỗi riêng.
-4. SEND message đến `/app/conversations/{conversationId}/messages`.
-5. SEND read receipt đến `/app/conversations/{conversationId}/read`.
-6. SEND `{ "typing": true }` đến `/app/conversations/{conversationId}/typing`.
+- Send: `/app/conversations/{conversationId}/messages`
+- Read: `/app/conversations/{conversationId}/read`
+- Typing: `/app/conversations/{conversationId}/typing`
+- Conversation subscription: `/topic/conversations/{conversationId}`
+- Private errors: `/user/queue/errors`
 
-Event envelope:
-
-```json
-{
-  "type": "MESSAGE_CREATED",
-  "conversationId": "uuid",
-  "actorUserId": "uuid",
-  "messageId": "uuid",
-  "sequence": 42,
-  "message": {}
-}
-```
-
-Event types: `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`, `MESSAGES_READ`
-và `TYPING`.
+Published event types are `MESSAGE_CREATED`, `MESSAGE_UPDATED`, `MESSAGE_DELETED`, `MESSAGES_READ`, and `TYPING`. Subscription to a conversation topic requires active membership.

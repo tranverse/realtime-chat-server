@@ -1,163 +1,143 @@
-# Kiến trúc hệ thống
+# Realtime Chat Application Architecture
 
-## 1. Mục tiêu
+## 1. System Overview
 
-Realtime Chat Server là một **modular monolith**: toàn bộ nghiệp vụ được đóng gói và
-deploy dưới dạng một Spring Boot application. MySQL lưu dữ liệu bền vững, Redis phục
-vụ rate limiting OTP và OAuth exchange code dùng một lần, còn STOMP simple broker xử lý realtime trong cùng process.
+The backend is a modular monolith: authentication, users, conversations, messaging, media, and realtime delivery run in one Spring Boot process and share one MySQL database and transaction model.
 
-Thiết kế này phù hợp với MVP và portfolio vì dễ chạy, dễ debug, transaction nhất quán
-và không tạo chi phí vận hành của hệ phân tán. Dự án không giả lập microservice bằng
-cách tách package hoặc container ứng dụng một cách không cần thiết.
-
-## 2. System context
-
-```mermaid
-flowchart LR
-    Client[Web / Mobile client]
-    Google[Google OAuth2]
-    SMTP[SMTP provider]
-    App[Spring Boot modular monolith]
-    DB[(MySQL 8)]
-    Redis[(Redis)]
-
-    Client -->|REST + JWT| App
-    Client <-->|STOMP over WebSocket| App
-    App <-->|OAuth2| Google
-    App -->|OTP email| SMTP
-    App -->|JPA transaction| DB
-    App -->|OTP rate limits| Redis
+```text
+React SPA
+   |
+REST + STOMP/WebSocket
+   |
+Spring Boot modular monolith
+   |-- MySQL
+   |-- Redis
+   |-- Cloudinary
+   `-- Email / Google OAuth2
 ```
 
-Chỉ service `app` chứa business logic và được deploy một lần. MySQL/Redis là hạ tầng
-dữ liệu, không phải các business microservice.
+MySQL and Redis are infrastructure dependencies, not independently deployed business services.
 
-## 3. Cấu trúc source
+## 2. Backend Modules
 
-| Package | Trách nhiệm |
-| --- | --- |
-| `controller` | REST endpoints và STOMP message mappings |
-| `service` | Use case, transaction boundary, authorization cấp tài nguyên |
-| `repository` | JPA query và locking |
-| `entity` | Domain state, relationship và database constraints |
-| `dto` | Request validation và response contract; không trả entity trực tiếp |
-| `security` | JWT, OAuth2 và user principal |
-| `config` | HTTP security, JPA, OpenAPI và WebSocket broker |
-| `exception` | Chuẩn hóa lỗi REST |
+- **Authentication:** local credentials, OTP workflows, OAuth2 login, JWT issuance, refresh-token rotation, and logout.
+- **Users:** profile retrieval/update and user search.
+- **Conversations:** private/group creation, membership, roles, invitation links, join requests, and ownership transfer.
+- **Messaging:** history, send, reply, edit, soft delete, and read-watermark updates.
+- **Media:** authenticated image validation and Cloudinary upload.
+- **Realtime/WebSocket:** STOMP authentication, subscription authorization, message events, typing, and read events.
 
-Các module nghiệp vụ hiện có: Identity & Access, User Profile, Conversation,
-Membership/Invitation và Messaging. Chúng nằm trong cùng codebase và cùng database
-transaction nhưng được tách trách nhiệm rõ ràng.
+REST and STOMP controllers translate transport requests into service calls. Services own use cases, transaction boundaries, and resource authorization. Repositories contain JPA persistence, queries, and locking. DTOs keep persistence entities out of public contracts.
 
-## 4. Data model
+## 3. Authentication
 
-```mermaid
-erDiagram
-    USER ||--o{ REFRESH_TOKEN : owns
-    USER ||--o{ CONVERSATION_MEMBER : joins
-    CONVERSATION ||--o{ CONVERSATION_MEMBER : contains
-    CONVERSATION ||--o{ MESSAGE : has
-    USER ||--o{ MESSAGE : sends
-    MESSAGE ||--o{ MESSAGE_ATTACHMENT : contains
-    MESSAGE o|--o{ MESSAGE : replies_to
-    CONVERSATION o|--o| MESSAGE : last_message
-    CONVERSATION_MEMBER o|--o| MESSAGE : last_read_message
-    CONVERSATION ||--o{ CONVERSATION_INVITE_LINK : exposes
-    CONVERSATION_MEMBER ||--o{ CONVERSATION_INVITE_LINK : creates
-    CONVERSATION ||--o{ CONVERSATION_JOIN_REQUEST : receives
-    USER ||--o{ CONVERSATION_JOIN_REQUEST : requests
+Local registration sends an email OTP before creating a user. Local login verifies the password, and password recovery uses a separate OTP and reset-token flow. Google OAuth2 creates or resolves the user through Spring Security, then redirects with a random exchange code rather than application tokens in the URL.
 
-    USER {
-      uuid id PK
-      string email UK
-      string username UK
-      string password_hash
-      enum provider
-      enum role
-    }
-    CONVERSATION {
-      uuid id PK
-      enum type
-      string direct_key UK
-      int max_members
-      uuid last_message_id FK
-    }
-    CONVERSATION_MEMBER {
-      uuid id PK
-      uuid conversation_id FK
-      uuid user_id FK
-      enum role
-      enum status
-      uuid last_read_message_id FK
-    }
-    MESSAGE {
-      uuid id PK
-      uuid conversation_id FK
-      uuid sender_user_id FK
-      bigint sequence
-      enum type
-      datetime edited_at
-      datetime deleted_at
-    }
+Access tokens authenticate REST and STOMP clients. Refresh tokens are rotated on use; only their hashes are stored. Reuse of a rotated token revokes active tokens in the same family. That security write runs in a separate `REQUIRES_NEW` transaction so it remains committed when the reuse request fails. Redis stores the OAuth2 exchange code for 60 seconds and atomically consumes it once.
+
+## 4. Authorization
+
+Spring Security permits only declared public authentication routes; other REST routes require an access JWT. Services enforce conversation membership and group `MEMBER`, `ADMIN`, and `OWNER` rules for the target resource. Message edit/delete operations validate both membership and sender or manager authority.
+
+The STOMP `CONNECT` frame must provide `Authorization: Bearer <token>`. Subscriptions to `/topic/conversations/{id}` require active membership. Application destinations still execute service-level authorization, so knowledge of a conversation UUID is never sufficient by itself.
+
+## 5. Realtime Messaging
+
+Clients connect to `/ws` using native WebSocket or SockJS and communicate with STOMP:
+
+- `/app/conversations/{id}/messages` sends messages.
+- `/app/conversations/{id}/typing` publishes typing state.
+- `/app/conversations/{id}/read` advances a read watermark.
+- `/topic/conversations/{id}` delivers conversation events.
+- `/user/queue/errors` delivers private protocol errors.
+
+Events include message creation, update, deletion, typing, and read receipts. Message events are published after the database transaction commits, preventing clients from observing rolled-back state. Clients can recover after reconnect by fetching sequence-based history from the REST API.
+
+The current simple STOMP broker is in-process and is not a distributed multi-instance broker.
+
+## 6. Message Model
+
+Each message belongs to one conversation and has a conversation-local monotonic `sequence`. A message can reference another message as a reply, be edited, or be soft-deleted. Attachments store image metadata and the Cloudinary URL. Each membership stores a last-read message as its read watermark.
+
+## 7. Message Ordering and Concurrency
+
+The final send path is:
+
+```text
+@Transactional
+-> lock conversation with PESSIMISTIC_WRITE
+-> validate active membership
+-> load sender
+-> read latest sequence
+-> allocate max(sequence) + 1
+-> persist message
+-> update conversation.lastMessage
+-> commit
+-> publish realtime event after commit
 ```
 
-### Các invariant chính
+Under MySQL `REPEATABLE READ`, a database read performed before acquiring the conversation lock can establish a consistent snapshot. A later sequence query could then observe stale state even after the lock is acquired. Locking the conversation before database-backed validation ensures subsequent sequence allocation observes the state committed by the previous lock owner.
 
-- Một user chỉ có một membership record trong mỗi conversation; rời nhóm rồi tham
-  gia lại sẽ reactivate record cũ.
-- Chat riêng có `direct_key` được chuẩn hóa từ hai UUID và unique, ngăn tạo hai phòng
-  trùng nhau.
-- `message.sequence` unique trong conversation, giúp cursor pagination và read receipt
-  ổn định.
-- Chỉ group có OWNER/ADMIN. OWNER phải chuyển quyền trước khi rời nhóm.
-- Message, user và conversation hỗ trợ soft delete bằng `deletedAt`.
+`UNIQUE(conversation_id, sequence)` is the defensive database invariant. The conversation lock serializes sends only within the same conversation; different conversation rows can proceed independently.
 
-## 5. Luồng gửi tin realtime
+## 8. Message History Pagination
 
-```mermaid
-sequenceDiagram
-    participant C as Client
-    participant W as WebSocket controller
-    participant S as MessageService
-    participant DB as MySQL
-    participant B as STOMP broker
+The history endpoint accepts `beforeSequence` and a bounded page size (default 50). The repository selects rows with a lower sequence and orders them descending. The `(conversation_id, sequence)` index supports a range scan that starts near the requested cursor.
 
-    C->>W: SEND /app/conversations/{id}/messages
-    W->>S: send(userId, conversationId, payload)
-    S->>DB: verify active membership
-    S->>DB: lock conversation row
-    S->>DB: allocate sequence and save message
-    S->>DB: update conversation.lastMessage
-    DB-->>S: commit
-    S->>B: MESSAGE_CREATED after commit
-    B-->>C: /topic/conversations/{id}
-```
+This keyset strategy fits append-heavy chat history because existing cursors remain stable as new messages arrive. Offset pagination supports arbitrary positional access but must traverse and discard increasingly many rows at deep positions and can shift under concurrent inserts.
 
-Conversation row được khóa pessimistic khi cấp sequence. Unique constraint
-`(conversation_id, sequence)` là lớp bảo vệ cuối cùng. Event chỉ phát sau khi
-transaction commit để client không nhận một message sau đó bị rollback.
+## 9. Redis
 
-## 6. Security model
+Redis is used for:
 
-- Access token HS256 dùng cho REST resource server và WebSocket CONNECT.
-- Refresh token có key riêng, chỉ lưu SHA-256 hash trong database và rotate sau mỗi
-  lần sử dụng. Reuse detection thu hồi toàn bộ token family.
-- WebSocket CONNECT yêu cầu native header `Authorization: Bearer ...`.
-- SUBSCRIBE `/topic/conversations/{id}` kiểm tra membership ACTIVE; biết UUID topic
-  không đồng nghĩa có quyền nghe dữ liệu.
-- Service kiểm tra quyền lại ở mọi write operation: WebSocket interceptor không thay
-  thế business authorization.
-- OTP register/reset có rate limit theo email/IP trong Redis.
-- Secret chỉ đọc qua environment; JWT secret không được ghi log.
+- OTP send limits: 5 per email and 20 per IP in 15 minutes.
+- OTP verification limits: 5 per email and 30 per IP in 5 minutes.
+- A 60-second OTP resend cooldown.
+- Single-use OAuth2 exchange codes with a 60-second TTL.
 
-## 7. Lựa chọn và giới hạn
+Redis is **not** currently used for message storage, general response caching, presence, HTTP sessions, the WebSocket broker, or distributed locks.
 
-Simple broker là lựa chọn có chủ ý cho một monolith instance. Khi cần chạy nhiều
-instance, có thể thay bằng broker relay (RabbitMQ) và shared presence mà không tách
-business service. Image binary hiện được gửi multipart qua endpoint có xác thực và
-backend upload lên Cloudinary. Pre-signed upload có thể là cải tiến tương lai nếu cần
-giảm tải băng thông cho application.
+## 10. Database Model
 
-Các chức năng chưa thuộc MVP: reaction, pin/search full-text, push notification,
-voice/video call và end-to-end encryption. Chúng được ghi trong roadmap thay vì thêm
-code nửa vời.
+Major entities are `User`, `Conversation`, `ConversationMember`, `Message`, `MessageAttachment`, `RefreshToken`, `PendingRegistration`, `PasswordResetToken`, `ConversationInviteLink`, and `ConversationJoinRequest`.
+
+- Users and conversations have a many-to-many relationship represented by `ConversationMember`, which also stores role, status, join method, and read watermark.
+- Conversations own messages; messages reference senders, optional reply targets, and attachments.
+- A normalized unique direct key prevents duplicate private conversations.
+- Membership is unique per `(conversation_id, user_id)` and can be reactivated after leaving.
+- Message sequence is unique and indexed per conversation.
+- Refresh tokens belong to users and token families; database state records rotation and revocation.
+- Invite links and join requests belong to group conversations and carry their own state and expiry rules.
+
+## 11. Transaction and Consistency Design
+
+- A pessimistic conversation lock protects local message-sequence allocation.
+- The unique conversation/sequence constraint rejects any duplicate that reaches persistence.
+- Realtime events are registered for after-commit publication.
+- Refresh-token reuse revokes the family in an independent transaction so failure handling cannot roll it back.
+- A conditional database update advances the read watermark only when the requested message sequence is newer, preventing regression during concurrent updates.
+
+## 12. Testing
+
+JUnit and Mockito cover isolated service rules. Spring Boot, MockMvc, H2, and Redis test doubles cover API, security, JWT, OAuth2 exchange, transaction, and persistence integration. MySQL 8.4 Testcontainers executes concurrent message allocation with real database locking and isolation. The parent repository contains Playwright user-flow tests. k6 drives both pagination and same-conversation send benchmarks.
+
+## 13. Infrastructure
+
+The backend has a Docker image. The parent application repository packages the React frontend with Docker and Nginx and provides the system E2E Docker Compose environment. Backend-local Compose starts the application, MySQL, and Redis. Mailpit is used by the system test environment for email inspection. GitHub Actions run backend tests on pushes and pull requests.
+
+## 14. External Integrations
+
+- **Google OAuth2:** external identity authentication followed by the single-use code exchange.
+- **Cloudinary:** authenticated image storage.
+- **SMTP:** OTP and password-recovery email delivery.
+- **Mailpit:** local/system-test SMTP capture rather than a production mail provider.
+
+## 15. Architecture Limitations
+
+- The system is a modular monolith, not a microservice architecture.
+- The in-process STOMP broker supports a single backend instance and provides no distributed fan-out.
+- Distributed presence is not implemented.
+- The model tracks read watermarks, not a separate delivery-receipt state.
+- Production distributed tracing is not configured.
+- Benchmarks are local controlled measurements, not production capacity or an SLA.
+- No claim is made for multi-instance realtime scalability.
