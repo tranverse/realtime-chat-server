@@ -35,6 +35,8 @@ class WebSocketAuthChannelInterceptorTest {
     JwtDecoder jwtDecoder;
     @Mock
     ConversationMemberRepository memberRepository;
+    @Mock
+    com.tranverse.chatserver.presence.PresenceAccess presenceAccess;
     @InjectMocks
     WebSocketAuthChannelInterceptor interceptor;
 
@@ -45,6 +47,34 @@ class WebSocketAuthChannelInterceptorTest {
                 () -> interceptor.preSend(message(StompCommand.CONNECT, null, null, null), ignoredChannel()));
 
         assertEquals("Missing WebSocket bearer token", exception.getMessage());
+    }
+
+    @Test
+    void presenceRequiresAuthenticationAndDirectPeerAuthorization() {
+        UUID viewer = UUID.randomUUID(), peer = UUID.randomUUID();
+        String topic = "/topic/presence/" + peer;
+        assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(
+                message(StompCommand.SUBSCRIBE, topic, null, null), ignoredChannel()));
+        org.mockito.Mockito.doThrow(new com.tranverse.chatserver.exception.AppException(
+                com.tranverse.chatserver.enums.ErrorCode.FORBIDDEN_CONVERSATION))
+                .when(presenceAccess).requireAccess(viewer, peer);
+        assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(
+                message(StompCommand.SUBSCRIBE, topic, null, authentication(viewer)), ignoredChannel()));
+    }
+
+    @Test
+    void allowedPresenceSubscriptionUsesAuthenticatedViewer() {
+        UUID viewer = UUID.randomUUID(), peer = UUID.randomUUID();
+        assertDoesNotThrow(() -> interceptor.preSend(message(StompCommand.SUBSCRIBE,
+                "/topic/presence/" + peer, null, authentication(viewer)), ignoredChannel()));
+        org.mockito.Mockito.verify(presenceAccess).requireAccess(viewer, peer);
+    }
+
+    @Test
+    void clientCannotForgePresenceBySendingToBrokerTopic() {
+        UUID viewer = UUID.randomUUID();
+        assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(message(StompCommand.SEND,
+                "/topic/presence/" + viewer, null, authentication(viewer)), ignoredChannel()));
     }
 
     @Test

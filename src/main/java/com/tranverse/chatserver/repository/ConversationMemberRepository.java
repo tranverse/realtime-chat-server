@@ -14,6 +14,16 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface ConversationMemberRepository extends JpaRepository<ConversationMember, UUID> {
+    @Query("""
+            select (count(viewer) > 0) from ConversationMember viewer, ConversationMember target
+             where viewer.conversation = target.conversation
+               and viewer.user.id = :viewerId and target.user.id = :targetId
+               and viewer.status = com.tranverse.chatserver.enums.ConversationMemberStatus.ACTIVE
+               and target.status = com.tranverse.chatserver.enums.ConversationMemberStatus.ACTIVE
+               and viewer.conversation.type = com.tranverse.chatserver.enums.ConversationType.PRIVATE
+            """)
+    boolean sharesActivePrivateConversation(UUID viewerId, UUID targetId);
+
     Optional<ConversationMember> findByConversationIdAndUserId(UUID conversationId, UUID userId);
 
     Optional<ConversationMember> findByConversationIdAndUserIdAndStatus(

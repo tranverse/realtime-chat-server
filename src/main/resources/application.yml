@@ -56,6 +56,10 @@ jwt:
   refresh-expiration-days: ${JWT_REFRESH_EXPIRATION_DAYS}
 
 app:
+  presence:
+    heartbeat-millis: ${PRESENCE_HEARTBEAT_MILLIS:25000}
+    expiry-millis: ${PRESENCE_EXPIRY_MILLIS:75000}
+    sweep-millis: ${PRESENCE_SWEEP_MILLIS:5000}
   oauth2:
     redirect-uri: ${OAUTH2_REDIRECT_URI:http://localhost:5173/oauth2/callback}
   cors:
