@@ -2,6 +2,7 @@ package com.tranverse.chatserver.config;
 
 import com.tranverse.chatserver.enums.ConversationMemberStatus;
 import com.tranverse.chatserver.repository.ConversationMemberRepository;
+import com.tranverse.chatserver.presence.PresenceAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;
@@ -32,6 +33,7 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
 
     private final JwtDecoder jwtDecoder;
     private final ConversationMemberRepository memberRepository;
+    private final PresenceAccess presenceAccess;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -44,6 +46,11 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             authenticate(accessor);
         } else if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
             authorizeSubscription(accessor);
+        } else if (StompCommand.SEND.equals(accessor.getCommand())
+                && accessor.getDestination() != null
+                && accessor.getDestination().startsWith("/topic/presence/")) {
+            // Only server-side Redis transitions may publish presence; clients cannot spoof a peer.
+            throw new MessageDeliveryException("Clients cannot publish presence transitions");
         }
         return message;
     }
@@ -68,6 +75,16 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
     private void authorizeSubscription(StompHeaderAccessor accessor) {
         String destination = accessor.getDestination();
         if (destination == null) {
+            return;
+        }
+        if (destination.startsWith("/topic/presence/")) {
+            if (accessor.getUser() == null) throw new MessageDeliveryException("Unauthenticated presence subscription");
+            try {
+                presenceAccess.requireAccess(UUID.fromString(accessor.getUser().getName()),
+                        UUID.fromString(destination.substring("/topic/presence/".length())));
+            } catch (RuntimeException exception) {
+                throw new MessageDeliveryException("Forbidden presence subscription");
+            }
             return;
         }
         Matcher matcher = CONVERSATION_TOPIC.matcher(destination);
