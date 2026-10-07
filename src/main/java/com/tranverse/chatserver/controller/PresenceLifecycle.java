@@ -1,4 +1,6 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.controller;
+
+import com.tranverse.chatserver.service.RedisPresenceStore;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.event.EventListener;

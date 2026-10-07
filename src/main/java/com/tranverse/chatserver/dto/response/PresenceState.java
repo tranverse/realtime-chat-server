@@ -1,4 +1,4 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.dto.response;
 
 import java.util.UUID;
 

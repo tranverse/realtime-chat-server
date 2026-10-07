@@ -36,7 +36,7 @@ class WebSocketAuthChannelInterceptorTest {
     @Mock
     ConversationMemberRepository memberRepository;
     @Mock
-    com.tranverse.chatserver.presence.PresenceAccess presenceAccess;
+    com.tranverse.chatserver.service.PresenceAccess presenceAccess;
     @InjectMocks
     WebSocketAuthChannelInterceptor interceptor;
 

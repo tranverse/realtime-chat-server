@@ -1,4 +1,8 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.integration;
+
+import com.tranverse.chatserver.config.PresenceProperties;
+import com.tranverse.chatserver.dto.response.PresenceState;
+import com.tranverse.chatserver.service.RedisPresenceStore;
 
 import org.junit.jupiter.api.*;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;

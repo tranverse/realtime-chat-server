@@ -1,4 +1,9 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.controller;
+
+import com.tranverse.chatserver.config.PresenceProperties;
+import com.tranverse.chatserver.dto.response.PresenceState;
+import com.tranverse.chatserver.service.PresenceAccess;
+import com.tranverse.chatserver.service.RedisPresenceStore;
 
 import com.tranverse.chatserver.dto.response.ApiResponse;
 import com.tranverse.chatserver.utils.SecurityUtils;
