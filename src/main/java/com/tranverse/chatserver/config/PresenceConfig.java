@@ -1,4 +1,7 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.config;
+
+import com.tranverse.chatserver.dto.response.PresenceState;
+import com.tranverse.chatserver.service.RedisPresenceStore;
 
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;

@@ -1,4 +1,7 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.service;
+
+import com.tranverse.chatserver.config.PresenceProperties;
+import com.tranverse.chatserver.dto.response.PresenceState;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.StringRedisTemplate;

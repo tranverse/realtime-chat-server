@@ -2,7 +2,7 @@ package com.tranverse.chatserver.config;
 
 import com.tranverse.chatserver.enums.ConversationMemberStatus;
 import com.tranverse.chatserver.repository.ConversationMemberRepository;
-import com.tranverse.chatserver.presence.PresenceAccess;
+import com.tranverse.chatserver.service.PresenceAccess;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.messaging.Message;

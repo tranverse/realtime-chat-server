@@ -1,4 +1,4 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.service;
 
 import com.tranverse.chatserver.repository.ConversationMemberRepository;
 import org.junit.jupiter.api.Test;

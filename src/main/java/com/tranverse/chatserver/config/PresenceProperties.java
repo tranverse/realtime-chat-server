@@ -1,4 +1,4 @@
-package com.tranverse.chatserver.presence;
+package com.tranverse.chatserver.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
