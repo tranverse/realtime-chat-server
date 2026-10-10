@@ -9,9 +9,23 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 public interface MessageRepository extends JpaRepository<Message, UUID> {
+
+    @EntityGraph(attributePaths = {"sender", "replyToMessage", "replyToMessage.sender", "attachments"})
+    Optional<Message> findByIdAndConversationId(UUID id, UUID conversationId);
+
+    // Page IDs, not collection fetch joins, so the database applies the actual LIMIT.
+    @Query("select m.id from Message m where m.conversation.id = :conversationId and m.sequence < :sequence order by m.sequence desc")
+    List<UUID> findIdsBefore(UUID conversationId, long sequence, Pageable pageable);
+
+    @Query("select m.id from Message m where m.conversation.id = :conversationId and m.sequence > :sequence order by m.sequence asc")
+    List<UUID> findIdsAfter(UUID conversationId, long sequence, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"sender", "replyToMessage", "replyToMessage.sender", "attachments"})
+    List<Message> findAllByIdInOrderBySequenceAsc(List<UUID> ids);
 
     @EntityGraph(attributePaths = {
             "sender",

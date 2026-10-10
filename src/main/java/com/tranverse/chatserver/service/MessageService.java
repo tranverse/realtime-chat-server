@@ -7,6 +7,7 @@ import com.tranverse.chatserver.dto.request.message.ReadConversationRequest;
 import com.tranverse.chatserver.dto.response.PageResponse;
 import com.tranverse.chatserver.dto.response.message.ChatEventResponse;
 import com.tranverse.chatserver.dto.response.message.ChatMessageResponse;
+import com.tranverse.chatserver.dto.response.message.MessageContextResponse;
 import com.tranverse.chatserver.entity.*;
 import com.tranverse.chatserver.enums.ConversationMemberRole;
 import com.tranverse.chatserver.enums.ErrorCode;
@@ -24,6 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @Service
@@ -35,6 +37,24 @@ public class MessageService {
     private final ConversationService conversationService;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
+
+    public MessageContextResponse getContext(UUID userId, UUID conversationId, UUID messageId) {
+        conversationService.requireActiveMember(conversationId, userId);
+        Message target = messageRepository.findByIdAndConversationId(messageId, conversationId)
+                .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
+        int radius = 20;
+        List<UUID> before = messageRepository.findIdsBefore(conversationId, target.getSequence(),
+                PageRequest.of(0, radius + 1));
+        List<UUID> after = messageRepository.findIdsAfter(conversationId, target.getSequence(),
+                PageRequest.of(0, radius + 1));
+        List<UUID> ids = new ArrayList<>(before.subList(0, Math.min(radius, before.size())));
+        ids.add(messageId);
+        ids.addAll(after.subList(0, Math.min(radius, after.size())));
+        return new MessageContextResponse(
+                messageRepository.findAllByIdInOrderBySequenceAsc(ids).stream()
+                        .map(ChatMessageResponse::from).toList(),
+                before.size() > radius, after.size() > radius);
+    }
 
     public PageResponse<ChatMessageResponse> getHistory(UUID userId,
                                                         UUID conversationId,

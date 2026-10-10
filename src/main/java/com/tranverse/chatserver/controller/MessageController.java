@@ -7,6 +7,7 @@ import com.tranverse.chatserver.dto.response.ApiResponse;
 import com.tranverse.chatserver.dto.response.PageResponse;
 import com.tranverse.chatserver.dto.response.auth.MessageResponse;
 import com.tranverse.chatserver.dto.response.message.ChatMessageResponse;
+import com.tranverse.chatserver.dto.response.message.MessageContextResponse;
 import com.tranverse.chatserver.service.MessageService;
 import com.tranverse.chatserver.utils.SecurityUtils;
 import jakarta.validation.Valid;
@@ -28,6 +29,16 @@ import java.util.UUID;
 @Validated
 public class MessageController {
     private final MessageService messageService;
+
+    @GetMapping("/conversations/{conversationId}/messages/{messageId}/context")
+    public ResponseEntity<ApiResponse<MessageContextResponse>> getMessageContext(
+            @AuthenticationPrincipal Jwt jwt, @PathVariable UUID conversationId,
+            @PathVariable UUID messageId) {
+        return ResponseEntity.ok(ApiResponse.<MessageContextResponse>builder()
+                .code(200).message("Message context retrieved successfully")
+                .data(messageService.getContext(SecurityUtils.userId(jwt), conversationId, messageId))
+                .build());
+    }
 
     @GetMapping("/conversations/{conversationId}/messages")
     public ResponseEntity<ApiResponse<PageResponse<ChatMessageResponse>>> getMessages(
