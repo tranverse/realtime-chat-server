@@ -48,9 +48,11 @@ public class WebSocketAuthChannelInterceptor implements ChannelInterceptor {
             authorizeSubscription(accessor);
         } else if (StompCommand.SEND.equals(accessor.getCommand())
                 && accessor.getDestination() != null
-                && accessor.getDestination().startsWith("/topic/presence/")) {
+                && (accessor.getDestination().startsWith("/topic/presence/")
+                    || accessor.getDestination().startsWith("/user/")
+                    || accessor.getDestination().startsWith("/queue/"))) {
             // Only server-side Redis transitions may publish presence; clients cannot spoof a peer.
-            throw new MessageDeliveryException("Clients cannot publish presence transitions");
+            throw new MessageDeliveryException("Clients cannot publish server-only events");
         }
         return message;
     }

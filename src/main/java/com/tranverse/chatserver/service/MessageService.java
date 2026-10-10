@@ -2,11 +2,11 @@ package com.tranverse.chatserver.service;
 
 import com.tranverse.chatserver.dto.request.message.AttachmentRequest;
 import com.tranverse.chatserver.dto.request.message.CreateMessageRequest;
-import com.tranverse.chatserver.dto.request.message.EditMessageRequest;
 import com.tranverse.chatserver.dto.request.message.ReadConversationRequest;
 import com.tranverse.chatserver.dto.response.PageResponse;
 import com.tranverse.chatserver.dto.response.message.ChatEventResponse;
 import com.tranverse.chatserver.dto.response.message.ChatMessageResponse;
+import com.tranverse.chatserver.dto.response.message.MessageContextResponse;
 import com.tranverse.chatserver.entity.*;
 import com.tranverse.chatserver.enums.ConversationMemberRole;
 import com.tranverse.chatserver.enums.ErrorCode;
@@ -24,6 +24,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.UUID;
 
 @Service
@@ -35,6 +36,24 @@ public class MessageService {
     private final ConversationService conversationService;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
+
+    public MessageContextResponse getContext(UUID userId, UUID conversationId, UUID messageId) {
+        conversationService.requireActiveMember(conversationId, userId);
+        Message target = messageRepository.findByIdAndConversationId(messageId, conversationId)
+                .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
+        int radius = 20;
+        List<UUID> before = messageRepository.findIdsBefore(conversationId, target.getSequence(),
+                PageRequest.of(0, radius + 1));
+        List<UUID> after = messageRepository.findIdsAfter(conversationId, target.getSequence(),
+                PageRequest.of(0, radius + 1));
+        List<UUID> ids = new ArrayList<>(before.subList(0, Math.min(radius, before.size())));
+        ids.add(messageId);
+        ids.addAll(after.subList(0, Math.min(radius, after.size())));
+        return new MessageContextResponse(
+                messageRepository.findAllByIdInOrderBySequenceAsc(ids).stream()
+                        .map(ChatMessageResponse::from).toList(),
+                before.size() > radius, after.size() > radius);
+    }
 
     public PageResponse<ChatMessageResponse> getHistory(UUID userId,
                                                         UUID conversationId,
@@ -93,26 +112,6 @@ public class MessageService {
         conversationRepository.save(conversation);
         ChatMessageResponse response = ChatMessageResponse.from(saved);
         publishAfterCommit(ChatEventResponse.created(userId, response));
-        return response;
-    }
-
-    @Transactional
-    public ChatMessageResponse edit(UUID userId, UUID messageId, EditMessageRequest request) {
-        Message message = messageRepository.findByIdAndDeletedAtIsNull(messageId)
-                .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
-        conversationService.requireActiveMember(message.getConversation().getId(), userId);
-        if (!message.getSender().getId().equals(userId)) {
-            throw new AppException(ErrorCode.FORBIDDEN_CONVERSATION,
-                    "Only the sender can edit this message");
-        }
-        if (message.getType() == MessageType.SYSTEM) {
-            throw new AppException(ErrorCode.INVALID_MESSAGE,
-                    "System messages cannot be edited");
-        }
-        message.edit(request.content().trim());
-        Message saved = messageRepository.save(message);
-        ChatMessageResponse response = ChatMessageResponse.from(saved);
-        publishAfterCommit(ChatEventResponse.updated(userId, response));
         return response;
     }
 

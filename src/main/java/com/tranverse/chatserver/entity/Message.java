@@ -70,8 +70,4 @@ public class Message extends BaseEntity {
         attachments.add(attachment);
     }
 
-    public void edit(String content) {
-        this.content = content;
-        this.editedAt = Instant.now();
-    }
 }

@@ -1,7 +1,6 @@
 package com.tranverse.chatserver.service;
 
 import com.tranverse.chatserver.dto.request.message.CreateMessageRequest;
-import com.tranverse.chatserver.dto.request.message.EditMessageRequest;
 import com.tranverse.chatserver.dto.request.message.ReadConversationRequest;
 import com.tranverse.chatserver.dto.response.message.ChatEventResponse;
 import com.tranverse.chatserver.dto.response.message.ChatMessageResponse;
@@ -110,50 +109,6 @@ class MessageServiceTest {
         ));
 
         assertEquals(ErrorCode.INVALID_MESSAGE, exception.getErrorCode());
-    }
-
-    @Test
-    void editUpdatesContentAndPublishesEvent() {
-        UUID userId = UUID.randomUUID();
-        UUID conversationId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
-        User sender = user(userId);
-        Conversation conversation = Conversation.create("Test", ConversationType.GROUP, 10, null);
-        conversation.setId(conversationId);
-        Message message = Message.create("Before", MessageType.TEXT, 3L, conversation, sender, null);
-        message.setId(messageId);
-
-        when(messageRepository.findByIdAndDeletedAtIsNull(messageId)).thenReturn(Optional.of(message));
-        when(messageRepository.save(message)).thenReturn(message);
-
-        ChatMessageResponse response = messageService.edit(
-                userId, messageId, new EditMessageRequest(" After "));
-
-        assertEquals("After", response.content());
-        assertNotNull(response.editedAt());
-        verify(conversationService).requireActiveMember(conversationId, userId);
-        verify(messagingTemplate).convertAndSend(
-                eq("/topic/conversations/" + conversationId), any(ChatEventResponse.class));
-    }
-
-    @Test
-    void editRejectsUserWhoIsNotSender() {
-        UUID senderId = UUID.randomUUID();
-        UUID actorId = UUID.randomUUID();
-        UUID conversationId = UUID.randomUUID();
-        UUID messageId = UUID.randomUUID();
-        Conversation conversation = Conversation.create("Test", ConversationType.GROUP, 10, null);
-        conversation.setId(conversationId);
-        Message message = Message.create(
-                "Before", MessageType.TEXT, 3L, conversation, user(senderId), null);
-        message.setId(messageId);
-        when(messageRepository.findByIdAndDeletedAtIsNull(messageId)).thenReturn(Optional.of(message));
-
-        AppException exception = assertThrows(AppException.class, () -> messageService.edit(
-                actorId, messageId, new EditMessageRequest("After")));
-
-        assertEquals(ErrorCode.FORBIDDEN_CONVERSATION, exception.getErrorCode());
-        verify(messageRepository, never()).save(any());
     }
 
     @Test

@@ -38,6 +38,8 @@ class ConversationServiceTest {
     private UserService userService;
     @Mock
     private UserRepository userRepository;
+    @Mock
+    private ConversationEventPublisher eventPublisher;
 
     @InjectMocks
     private ConversationService conversationService;
