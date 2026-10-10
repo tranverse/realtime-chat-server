@@ -2,7 +2,6 @@ package com.tranverse.chatserver.service;
 
 import com.tranverse.chatserver.dto.request.message.AttachmentRequest;
 import com.tranverse.chatserver.dto.request.message.CreateMessageRequest;
-import com.tranverse.chatserver.dto.request.message.EditMessageRequest;
 import com.tranverse.chatserver.dto.request.message.ReadConversationRequest;
 import com.tranverse.chatserver.dto.response.PageResponse;
 import com.tranverse.chatserver.dto.response.message.ChatEventResponse;
@@ -113,26 +112,6 @@ public class MessageService {
         conversationRepository.save(conversation);
         ChatMessageResponse response = ChatMessageResponse.from(saved);
         publishAfterCommit(ChatEventResponse.created(userId, response));
-        return response;
-    }
-
-    @Transactional
-    public ChatMessageResponse edit(UUID userId, UUID messageId, EditMessageRequest request) {
-        Message message = messageRepository.findByIdAndDeletedAtIsNull(messageId)
-                .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
-        conversationService.requireActiveMember(message.getConversation().getId(), userId);
-        if (!message.getSender().getId().equals(userId)) {
-            throw new AppException(ErrorCode.FORBIDDEN_CONVERSATION,
-                    "Only the sender can edit this message");
-        }
-        if (message.getType() == MessageType.SYSTEM) {
-            throw new AppException(ErrorCode.INVALID_MESSAGE,
-                    "System messages cannot be edited");
-        }
-        message.edit(request.content().trim());
-        Message saved = messageRepository.save(message);
-        ChatMessageResponse response = ChatMessageResponse.from(saved);
-        publishAfterCommit(ChatEventResponse.updated(userId, response));
         return response;
     }
 

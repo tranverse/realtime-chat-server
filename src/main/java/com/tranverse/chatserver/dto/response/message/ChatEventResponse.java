@@ -26,13 +26,6 @@ public record ChatEventResponse(
         );
     }
 
-    public static ChatEventResponse updated(UUID actorUserId, ChatMessageResponse message) {
-        return new ChatEventResponse(
-                "MESSAGE_UPDATED", message.conversationId(), actorUserId,
-                message.id(), message.sequence(), message
-        );
-    }
-
     public static ChatEventResponse read(UUID conversationId, UUID actorUserId, UUID messageId, long sequence) {
         return new ChatEventResponse(
                 "MESSAGES_READ", conversationId, actorUserId, messageId, sequence, null

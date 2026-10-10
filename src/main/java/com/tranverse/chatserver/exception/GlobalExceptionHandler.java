@@ -5,11 +5,13 @@ import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -20,6 +22,16 @@ import java.time.LocalDateTime;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleUnsupportedMethod(HttpRequestMethodNotSupportedException exception) {
+        var response = ResponseEntity.status(HttpStatus.METHOD_NOT_ALLOWED);
+        if (exception.getSupportedHttpMethods() != null) {
+            response.allow(exception.getSupportedHttpMethods().toArray(HttpMethod[]::new));
+        }
+        return response.body(ErrorResponse.builder()
+                .code("405").message("HTTP method is not supported for this resource")
+                .status(405).timestamp(LocalDateTime.now()).build());
+    }
     @ExceptionHandler(AppException.class)
     public ResponseEntity<ErrorResponse> handleAppException(AppException e) {
         ErrorCode errorCode = e.getErrorCode();
