@@ -32,6 +32,7 @@ public class ConversationService {
     private final MessageRepository messageRepository;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final ConversationEventPublisher eventPublisher;
 
     public PageResponse<ConversationResponse> getConversations(UUID userId, int page, int size) {
         int safePage = Math.max(page, 0);
@@ -119,6 +120,7 @@ public class ConversationService {
             ));
         }
 
+        notifyChanged(conversation, "CREATED", requestedIds, Set.of());
         return toResponse(conversation, userId, true);
     }
 
@@ -145,7 +147,9 @@ public class ConversationService {
             }
             conversation.setMaxMembers(request.maxMembers());
         }
-        return toResponse(conversationRepository.save(conversation), userId, true);
+        conversationRepository.save(conversation);
+        notifyChanged(conversation, "PROFILE_UPDATED", Set.of(), Set.of());
+        return toResponse(conversation, userId, true);
     }
 
     @Transactional
@@ -164,6 +168,7 @@ public class ConversationService {
         for (User user : users) {
             addOrReactivate(conversation, user, JoinMethod.INVITATION, inviter, null);
         }
+        notifyChanged(conversation, "MEMBERS_ADDED", userIds, Set.of());
         return toResponse(conversation, userId, true);
     }
 
@@ -184,6 +189,7 @@ public class ConversationService {
         }
         target.remove();
         memberRepository.save(target);
+        notifyChanged(conversation, "MEMBER_REMOVED", Set.of(), Set.of(targetUserId));
     }
 
     @Transactional
@@ -200,6 +206,7 @@ public class ConversationService {
         }
         member.leave();
         memberRepository.save(member);
+        notifyChanged(conversation, "MEMBER_LEFT", Set.of(), Set.of(userId));
     }
 
     @Transactional
@@ -222,7 +229,9 @@ public class ConversationService {
         } else {
             target.demoteToMember();
         }
-        return ConversationMemberResponse.from(memberRepository.save(target));
+        memberRepository.save(target);
+        notifyChanged(conversation, "ROLE_UPDATED", Set.of(), Set.of());
+        return ConversationMemberResponse.from(target);
     }
 
     @Transactional
@@ -239,6 +248,7 @@ public class ConversationService {
         currentOwner.setRole(ConversationMemberRole.ADMIN);
         nextOwner.setRole(ConversationMemberRole.OWNER);
         memberRepository.saveAll(List.of(currentOwner, nextOwner));
+        notifyChanged(conversation, "OWNERSHIP_TRANSFERRED", Set.of(), Set.of());
         return toResponse(conversation, ownerUserId, true);
     }
 
@@ -295,12 +305,15 @@ public class ConversationService {
             }
             ConversationJoinRequest joinRequest = ConversationJoinRequest.create(
                     blankToNull(request.message()), user, conversation, link);
+            joinRequestRepository.save(joinRequest);
+            notifyChanged(conversation, "JOIN_REQUEST_CREATED", Set.of(), Set.of());
             return JoinResultResponse.pending(
-                    JoinRequestResponse.from(joinRequestRepository.save(joinRequest)));
+                    JoinRequestResponse.from(joinRequest));
         }
 
         ensureCapacity(conversation, 1);
         addOrReactivate(conversation, user, JoinMethod.INVITE_LINK, null, null);
+        notifyChanged(conversation, "MEMBERS_ADDED", Set.of(userId), Set.of());
         return JoinResultResponse.joined(toResponse(conversation, userId, true));
     }
 
@@ -343,7 +356,21 @@ public class ConversationService {
         } else {
             joinRequest.reject(reviewer);
         }
-        return JoinRequestResponse.from(joinRequestRepository.save(joinRequest));
+        joinRequestRepository.save(joinRequest);
+        notifyChanged(conversation, "JOIN_REQUEST_REVIEWED",
+                Boolean.TRUE.equals(review.approved()) ? Set.of(joinRequest.getRequestedByUser().getId()) : Set.of(),
+                Set.of());
+        return JoinRequestResponse.from(joinRequest);
+    }
+
+    private void notifyChanged(Conversation conversation, String reason, Set<UUID> added, Set<UUID> removed) {
+        Set<UUID> recipients = new HashSet<>();
+        memberRepository.findAllByConversationIdAndStatusOrderByJoinedAtAsc(
+                conversation.getId(), ConversationMemberStatus.ACTIVE)
+                .forEach(member -> recipients.add(member.getUser().getId()));
+        recipients.addAll(added);
+        recipients.addAll(removed);
+        eventPublisher.publish(conversation.getId(), conversation.getName(), reason, recipients, added, removed);
     }
 
     public ConversationMember requireActiveMember(UUID conversationId, UUID userId) {

@@ -20,10 +20,11 @@ public interface ConversationRepository extends JpaRepository<Conversation, UUID
     @Query(value = """
             select c from Conversation c
             join c.members m
+            left join c.lastMessage latestMessage
             where m.user.id = :userId
               and m.status = :status
               and c.deletedAt is null
-            order by coalesce(c.lastMessage.createdAt, c.createdAt) desc
+            order by coalesce(latestMessage.createdAt, c.createdAt) desc
             """,
             countQuery = """
             select count(c) from Conversation c

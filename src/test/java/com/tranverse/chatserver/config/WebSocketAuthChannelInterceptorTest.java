@@ -90,6 +90,15 @@ class WebSocketAuthChannelInterceptorTest {
     }
 
     @Test
+    void clientsCannotForgeConversationManagementQueueEvents() {
+        UUID viewer = UUID.randomUUID();
+        for (String destination : List.of("/user/queue/conversations", "/queue/conversations")) {
+            assertThrows(MessageDeliveryException.class, () -> interceptor.preSend(
+                    message(StompCommand.SEND, destination, null, authentication(viewer)), ignoredChannel()));
+        }
+    }
+
+    @Test
     void connectAuthenticatesValidJwtAndAuthorities() {
         UUID userId = UUID.randomUUID();
         Jwt jwt = Jwt.withTokenValue("valid")
