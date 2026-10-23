@@ -10,6 +10,8 @@ import com.tranverse.chatserver.enums.ConversationType;
 import com.tranverse.chatserver.enums.JoinMethod;
 import com.tranverse.chatserver.enums.MessageType;
 import com.tranverse.chatserver.enums.SystemRole;
+import com.tranverse.chatserver.enums.ErrorCode;
+import com.tranverse.chatserver.exception.AppException;
 import com.tranverse.chatserver.repository.ConversationMemberRepository;
 import com.tranverse.chatserver.repository.ConversationRepository;
 import com.tranverse.chatserver.repository.MessageRepository;
@@ -20,6 +22,9 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -28,8 +33,13 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest
+@AutoConfigureMockMvc
 class ReadReceiptConcurrencyIntegrationTest {
 
     @Autowired
@@ -42,6 +52,8 @@ class ReadReceiptConcurrencyIntegrationTest {
     ConversationRepository conversationRepository;
     @Autowired
     UserRepository userRepository;
+    @Autowired
+    MockMvc mvc;
 
     private User user;
     private Conversation conversation;
@@ -89,6 +101,63 @@ class ReadReceiptConcurrencyIntegrationTest {
     void duplicateMarkReadIsIdempotent() {
         mark(message100);
         mark(message100);
+
+        assertEquals(message100.getId(), persistedLastReadMessageId());
+    }
+
+    @Test
+    void reopeningHistoryWithDeletedNewestMessageCanMarkItsPositionRead() {
+        messageService.delete(user.getId(), message100.getId());
+
+        // History deliberately retains a tombstone, which the client uses as its newest ID.
+        assertEquals(message100.getId(), messageService.getHistory(
+                user.getId(), conversation.getId(), null, 50).items().getFirst().id());
+        mark(message100);
+        mark(message100);
+
+        assertEquals(message100.getId(), persistedLastReadMessageId());
+        // A later, older read must not regress the watermark after the deletion.
+        mark(message50);
+        assertEquals(message100.getId(), persistedLastReadMessageId());
+    }
+
+    @Test
+    void deletedMessageFromAnotherConversationCannotBeUsedAsReadWatermark() {
+        Conversation other = conversationRepository.save(
+                Conversation.create("Other", ConversationType.GROUP, 10, null));
+        Message foreign = Message.create("Private", MessageType.TEXT, 200L, other, user, null);
+        foreign.softDelete();
+        messageRepository.save(foreign);
+        mark(message50);
+
+        AppException error = assertThrows(AppException.class, () -> mark(foreign));
+
+        assertEquals(ErrorCode.MESSAGE_NOT_FOUND, error.getErrorCode());
+        assertEquals(message50.getId(), persistedLastReadMessageId());
+    }
+
+    @Test
+    void unknownMessageCannotBeUsedAsReadWatermark() {
+        mark(message50);
+
+        AppException error = assertThrows(AppException.class, () -> messageService.markRead(
+                user.getId(), conversation.getId(),
+                new ReadConversationRequest(java.util.UUID.randomUUID())));
+
+        assertEquals(ErrorCode.MESSAGE_NOT_FOUND, error.getErrorCode());
+        assertEquals(message50.getId(), persistedLastReadMessageId());
+    }
+
+    @Test
+    void restReadEndpointAcceptsDeletedMessageWhenAllMessagesAreDeleted() throws Exception {
+        messageService.delete(user.getId(), message50.getId());
+        messageService.delete(user.getId(), message100.getId());
+
+        mvc.perform(post("/api/v1/conversations/{id}/read", conversation.getId())
+                        .with(jwt().jwt(token -> token.subject(user.getId().toString())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"messageId\":\"" + message100.getId() + "\"}"))
+                .andExpect(status().isOk());
 
         assertEquals(message100.getId(), persistedLastReadMessageId());
     }

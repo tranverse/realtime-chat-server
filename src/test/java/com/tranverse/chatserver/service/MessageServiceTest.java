@@ -123,7 +123,7 @@ class MessageServiceTest {
         Message newer = Message.create("New", MessageType.TEXT, 9L, conversation, user, null);
         newer.setId(UUID.randomUUID());
         when(conversationService.requireActiveMember(conversationId, userId)).thenReturn(member);
-        when(messageRepository.findByIdAndDeletedAtIsNull(newer.getId())).thenReturn(Optional.of(newer));
+        when(messageRepository.findById(newer.getId())).thenReturn(Optional.of(newer));
         when(conversationService.advanceLastReadIfNewer(member.getId(), newer)).thenReturn(true);
 
         messageService.markRead(userId, conversationId, new ReadConversationRequest(newer.getId()));
@@ -145,12 +145,26 @@ class MessageServiceTest {
         Message message = Message.create("Already read", MessageType.TEXT, 9L, conversation, user, null);
         message.setId(UUID.randomUUID());
         when(conversationService.requireActiveMember(conversationId, userId)).thenReturn(member);
-        when(messageRepository.findByIdAndDeletedAtIsNull(message.getId())).thenReturn(Optional.of(message));
+        when(messageRepository.findById(message.getId())).thenReturn(Optional.of(message));
         when(conversationService.advanceLastReadIfNewer(member.getId(), message)).thenReturn(false);
 
         messageService.markRead(userId, conversationId, new ReadConversationRequest(message.getId()));
 
         verify(messagingTemplate, never()).convertAndSend(anyString(), any(ChatEventResponse.class));
+    }
+
+    @Test
+    void markReadRejectsNonMemberBeforeLookingUpMessage() {
+        UUID userId = UUID.randomUUID();
+        UUID conversationId = UUID.randomUUID();
+        when(conversationService.requireActiveMember(conversationId, userId))
+                .thenThrow(new AppException(ErrorCode.FORBIDDEN_CONVERSATION));
+
+        AppException error = assertThrows(AppException.class, () -> messageService.markRead(
+                userId, conversationId, new ReadConversationRequest(UUID.randomUUID())));
+
+        assertEquals(ErrorCode.FORBIDDEN_CONVERSATION, error.getErrorCode());
+        verifyNoInteractions(messageRepository, messagingTemplate);
     }
 
     private User user(UUID id) {

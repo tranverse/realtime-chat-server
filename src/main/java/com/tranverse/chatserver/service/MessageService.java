@@ -120,7 +120,8 @@ public class MessageService {
                          UUID conversationId,
                          ReadConversationRequest request) {
         ConversationMember member = conversationService.requireActiveMember(conversationId, userId);
-        Message message = messageRepository.findByIdAndDeletedAtIsNull(request.messageId())
+        // A read watermark is a timeline position, including soft-deleted tombstones.
+        Message message = messageRepository.findById(request.messageId())
                 .filter(candidate -> candidate.getConversation().getId().equals(conversationId))
                 .orElseThrow(() -> new AppException(ErrorCode.MESSAGE_NOT_FOUND));
 
